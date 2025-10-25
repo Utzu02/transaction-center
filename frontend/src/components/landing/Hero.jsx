@@ -40,7 +40,7 @@ const Hero = ({ onGetStarted }) => {
           </p>
 
           {/* CTA Button */}
-          <div className="flex justify-center mb-8 sm:mb-12 md:mb-16">
+          <div className="flex flex-col items-center mb-8 sm:mb-12 md:mb-16">
             <button
               onClick={onGetStarted}
               className="group relative inline-flex items-center gap-2 sm:gap-3 px-5 sm:px-6 py-3 sm:py-4 md:py-5 text-lg sm:text-xl font-display font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/50"
@@ -48,6 +48,7 @@ const Hero = ({ onGetStarted }) => {
               <span>Launch Dashboard</span>
               <Rocket className="w-5 h-5 sm:w-6 sm:h-6 group-hover:-translate-y-1 group-hover:rotate-12 transition-all duration-300" />
             </button>
+            <p className="mt-3 text-sm text-gray-400 font-display">Powered by Rafallos</p>
           </div>
 
           {/* Feature pills */}
@@ -69,7 +70,7 @@ const Hero = ({ onGetStarted }) => {
       </div>
 
       {/* Bottom gradient fade */}
-      <div className="absolute bottom-0 left-0 right-0 h-20 sm:h-24 md:h-32 bg-gradient-to-t from-gray-50 to-transparent"></div>
+      <div className="absolute bottom-0 left-0 right-0 h-20 sm:h-24 md:h-20 bg-gradient-to-t from-gray-50 to-transparent"></div>
     </div>
   );
 };

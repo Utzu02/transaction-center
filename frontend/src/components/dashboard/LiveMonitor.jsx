@@ -38,22 +38,22 @@ const LiveMonitor = ({ connectionStatus, stats }) => {
 
       <div className="grid grid-cols-3 gap-4">
         <div className="text-center p-4 bg-primary-50 rounded-lg">
-          <div className="text-2xl font-bold text-primary-600 mb-1">
+          <p className="text-2xl font-bold text-primary-600 mb-1">
             {stats.processed}
-          </div>
-          <div className="text-xs text-gray-600">Processed</div>
+          </p>
+          <p className="text-xs text-gray-600">Processed</p>
         </div>
         <div className="text-center p-4 bg-danger-50 rounded-lg">
-          <div className="text-2xl font-bold text-danger-600 mb-1">
+          <p className="text-2xl font-bold text-danger-600 mb-1">
             {stats.fraudDetected}
-          </div>
-          <div className="text-xs text-gray-600">Fraud Detected</div>
+          </p>
+          <p className="text-xs text-gray-600">Fraud Detected</p>
         </div>
         <div className="text-center p-4 bg-success-50 rounded-lg">
-          <div className="text-2xl font-bold text-success-600 mb-1">
+          <p className="text-2xl font-bold text-success-600 mb-1">
             {stats.reported}
-          </div>
-          <div className="text-xs text-gray-600">Reported</div>
+          </p>
+          <p className="text-xs text-gray-600">Reported</p>
         </div>
       </div>
 

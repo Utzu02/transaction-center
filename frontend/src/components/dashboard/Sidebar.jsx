@@ -81,9 +81,9 @@ const Sidebar = () => {
       
       {/* Bottom gradient */}
       <div className="p-4 border-t border-white/10">
-        <div className="text-center text-xs text-gray-500">
+        <p className="text-center text-xs text-gray-500">
           Powered by Rafallos
-        </div>
+        </p>
       </div>
     </aside>
   );

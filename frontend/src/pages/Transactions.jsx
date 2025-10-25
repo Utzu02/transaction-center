@@ -1,13 +1,17 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Search, SlidersHorizontal } from 'lucide-react';
+import { Search, SlidersHorizontal, RefreshCw } from 'lucide-react';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import TransactionList from '../components/dashboard/TransactionList';
 import Card from '../components/common/Card';
 import FilterDropdown from '../components/common/FilterDropdown';
 import RangeFilterDropdown from '../components/common/RangeFilterDropdown';
+import Button from '../components/common/Button';
+import { useToast } from '../components/common/ToastContainer';
+import apiService from '../services/api';
 
 const Transactions = () => {
+  const toast = useToast();
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedMerchants, setSelectedMerchants] = useState([]);
   const [selectedCategories, setSelectedCategories] = useState([]);
@@ -18,6 +22,12 @@ const Transactions = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [allTransactions, setAllTransactions] = useState([]);
   const [totalFilteredCount, setTotalFilteredCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total: 0,
+    accepted: 0,
+    blocked: 0
+  });
   
   // Range filters
   const [timeRange, setTimeRange] = useState([0, 24]); // hours
@@ -57,6 +67,7 @@ const Transactions = () => {
   const locationOptions = useMemo(() => {
     const locationCounts = {};
     allTransactions.forEach(t => {
+      if (!t.location || t.location === 'Unknown') return;
       // Extract state from location (e.g., "Bakersfield, CA" -> "CA")
       const parts = t.location.split(',');
       const state = parts[parts.length - 1].trim();
@@ -122,10 +133,66 @@ const Transactions = () => {
     setAllTransactions(transactions);
   };
 
-  const stats = [
-    { label: 'Total', value: '12,456', color: 'bg-primary-100 text-primary-600', ringColor: 'ring-blue-500' },
-    { label: 'Accepted', value: '12,069', color: 'bg-green-100 text-green-600', ringColor: 'ring-green-500' },
-    { label: 'Blocked', value: '387', color: 'bg-red-100 text-red-600', ringColor: 'ring-red-500' },
+  // Fetch transactions from backend
+  const fetchTransactions = async () => {
+    setIsLoading(true);
+    try {
+      console.log('🔄 Fetching transactions from backend...');
+      const response = await apiService.getTransactions({ limit: 1000, sort_order: -1 });
+      console.log('📦 Backend response:', response);
+      
+      if (response.success && response.transactions) {
+        console.log(`✅ Found ${response.transactions.length} transactions`);
+        
+        // Transform backend data to frontend format
+        const formatted = response.transactions.map(tx => ({
+          id: tx.trans_num || tx.id,
+          merchant: tx.merchant || 'Unknown',
+          amount: tx.amt ? `$${tx.amt.toFixed(2)}` : '$0.00',
+          status: tx.status || 'completed',
+          riskScore: tx.risk_score || 0,
+          date: tx.trans_date && tx.trans_time ? `${tx.trans_date} ${tx.trans_time}` : tx.created_at,
+          category: tx.category || 'Unknown',
+          customer: tx.first && tx.last ? `${tx.first} ${tx.last}` : (tx.customer || 'Unknown'),
+          location: tx.city && tx.state ? `${tx.city}, ${tx.state}` : (tx.location || 'Unknown'),
+          method: tx.cc_num ? `****${String(tx.cc_num).slice(-4)}` : 'Unknown'
+        }));
+        
+        console.log('✨ Formatted transactions:', formatted);
+        setAllTransactions(formatted);
+        
+        // Calculate stats
+        const total = formatted.length;
+        const accepted = formatted.filter(t => t.status === 'completed').length;
+        const blocked = formatted.filter(t => t.status === 'blocked').length;
+        
+        console.log('📊 Stats:', { total, accepted, blocked });
+        setStats({ total, accepted, blocked });
+        
+        toast.showSuccess(`Loaded ${total} transactions`, 2000);
+      } else {
+        console.error('❌ Invalid response format:', response);
+        toast.showError('Invalid response from server', 3000);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching transactions:', error);
+      toast.showError(`Failed to load transactions: ${error.message}`, 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Fetch on mount
+  useEffect(() => {
+    console.log('🚀 Transactions page mounted, fetching data...');
+    fetchTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const statsDisplay = [
+    { label: 'Total', value: stats.total.toLocaleString(), color: 'bg-primary-100 text-primary-600', ringColor: 'ring-blue-500' },
+    { label: 'Accepted', value: stats.accepted.toLocaleString(), color: 'bg-green-100 text-green-600', ringColor: 'ring-green-500' },
+    { label: 'Blocked', value: stats.blocked.toLocaleString(), color: 'bg-red-100 text-red-600', ringColor: 'ring-red-500' },
   ];
 
   return (
@@ -138,17 +205,34 @@ const Transactions = () => {
         <main className="flex-1 overflow-y-scroll overflow-x-hidden">
           <div className="p-6 space-y-6">
             {/* Page Header */}
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-gray-900 bg-clip-text text-transparent">Transactions</h1>
-              <p className="text-gray-600">View and manage all transaction records</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 via-blue-900 to-gray-900 bg-clip-text text-transparent">Transactions</h1>
+                <p className="text-gray-600">View and manage all transaction records</p>
+              </div>
+              <Button
+                onClick={fetchTransactions}
+                disabled={isLoading}
+                variant="outline"
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
 
             {/* Stats Cards */}
             <div className="grid md:grid-cols-3 gap-6">
-              {stats.map((stat, index) => {
-                const isActive = (filterStatus === 'all' && stat.label === 'Total') ||
-                                (filterStatus === 'accepted' && stat.label === 'Accepted') ||
-                                (filterStatus === 'blocked' && stat.label === 'Blocked');
+              {isLoading ? (
+                <div className="col-span-3 text-center py-8 text-gray-500">
+                  <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-2" />
+                  Loading transactions...
+                </div>
+              ) : (
+                statsDisplay.map((stat, index) => {
+                  const isActive = (filterStatus === 'all' && stat.label === 'Total') ||
+                                  (filterStatus === 'accepted' && stat.label === 'Accepted') ||
+                                  (filterStatus === 'blocked' && stat.label === 'Blocked');
                 
                 return (
                   <Card 
@@ -177,7 +261,8 @@ const Transactions = () => {
                     </div>
                   </Card>
                 );
-              })}
+              })
+              )}
             </div>
 
             {/* Search Bar */}
@@ -189,7 +274,7 @@ const Transactions = () => {
                   placeholder="Search by ID, merchant, customer, amount, or location..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/80"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/80 placeholder:text-gray-400"
                 />
                 {searchTerm && (
                   <button
@@ -386,8 +471,21 @@ const Transactions = () => {
               </div>
             </Card>
 
+            {/* Loading State */}
+            {isLoading && allTransactions.length === 0 && (
+              <Card>
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+                    <p className="text-gray-600">Loading transactions...</p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* Transaction List */}
             <TransactionList 
+              transactions={allTransactions}
               filter={filterStatus} 
               maxRows={visibleCount}
               showExport={true}

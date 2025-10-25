@@ -77,7 +77,7 @@ const NotificationDropdown = () => {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-12 w-96 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 z-[9999] animate-fade-in">
+        <div className="absolute right-0 top-12 w-96 bg-white backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 z-[9999] animate-fade-in">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <div>

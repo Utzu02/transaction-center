@@ -81,6 +81,7 @@ class WebSocketService {
       this.listeners.set(event, []);
     }
     this.listeners.get(event).push(callback);
+    return () => this.unsubscribe(event, callback); // Return cleanup function
   }
 
   unsubscribe(event, callback) {

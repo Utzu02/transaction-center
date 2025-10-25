@@ -12,8 +12,8 @@ const Header = () => {
           {/* User Menu */}
           <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
             <div className="text-right">
-              <div className="text-sm font-semibold text-gray-900">Admin User</div>
-              <div className="text-xs text-gray-500">admin@rafallos.com</div>
+              <p className="text-sm font-semibold text-gray-900">Admin User</p>
+              <p className="text-xs text-gray-500">admin@rafallos.com</p>
             </div>
             <button className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/50 transition-all transform hover:scale-105">
               <User className="w-5 h-5" />

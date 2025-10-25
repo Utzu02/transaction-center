@@ -92,18 +92,18 @@ const AgeSegmentAnalysis = ({ transactions = [] }) => {
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
                 <div>
-                  <div className="text-xs font-semibold text-red-600 mb-1">Most Vulnerable Segment</div>
-                  <div className="text-lg font-bold text-gray-900">
+                  <p className="text-xs font-semibold text-red-600 mb-1">Most Vulnerable Segment</p>
+                  <p className="text-lg font-bold text-gray-900">
                     {stats.mostVulnerable.segment} years old
-                  </div>
-                  <div className="text-sm text-gray-700 mt-1">
+                  </p>
+                  <p className="text-sm text-gray-700 mt-1">
                     <span className="font-semibold">{stats.mostVulnerable.fraudCount}</span> fraud cases
                     {stats.total > 0 && (
                       <span className="text-gray-600">
                         {' '}• {((stats.mostVulnerable.fraudCount / stats.total) * 100).toFixed(1)}% of total
                       </span>
                     )}
-                  </div>
+                  </p>
                 </div>
               </div>
             </div>

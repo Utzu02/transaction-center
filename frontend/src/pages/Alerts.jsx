@@ -1,58 +1,93 @@
-import { AlertTriangle, CheckCircle, Clock, XCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { AlertTriangle, CheckCircle, Clock, XCircle, RefreshCw } from 'lucide-react';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import FraudAlert from '../components/dashboard/FraudAlert';
 import Card from '../components/common/Card';
+import Button from '../components/common/Button';
+import { useToast } from '../components/common/ToastContainer';
+import apiService from '../services/api';
 
 const Alerts = () => {
-  const alertStats = [
-    { label: 'Active', value: '12', icon: AlertTriangle, color: 'danger' },
-    { label: 'Resolved', value: '156', icon: CheckCircle, color: 'success' },
-    { label: 'Pending', value: '8', icon: Clock, color: 'warning' },
-    { label: 'Dismissed', value: '43', icon: XCircle, color: 'default' },
-  ];
+  const toast = useToast();
+  const [alerts, setAlerts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState({
+    active: 0,
+    resolved: 0,
+    pending: 0,
+    dismissed: 0
+  });
 
-  const mockAlerts = [
-    {
-      title: 'Suspicious Transaction Detected',
-      description: 'Multiple failed payment attempts from the same IP in the last 5 minutes.',
-      severity: 'high',
-      time: '2 minutes ago',
-      transactionId: 'TXN-001238',
-      amount: '€2,500.00'
-    },
-    {
-      title: 'Unusual Pattern Identified',
-      description: 'Unusually large amount compared to customer history.',
-      severity: 'medium',
-      time: '15 minutes ago',
-      transactionId: 'TXN-001235',
-      amount: '€856.00'
-    },
-    {
-      title: 'High Risk Country Transaction',
-      description: 'Transaction from a high-risk country detected.',
-      severity: 'medium',
-      time: '1 hour ago',
-      transactionId: 'TXN-001201',
-      amount: '€1,200.00'
-    },
-    {
-      title: 'Velocity Check Failed',
-      description: 'Too many transactions in a short time period.',
-      severity: 'low',
-      time: '2 hours ago',
-      transactionId: 'TXN-001189',
-      amount: '€450.00'
-    },
-    {
-      title: 'Card Testing Detected',
-      description: 'Multiple small transactions detected, possible card testing.',
-      severity: 'high',
-      time: '3 hours ago',
-      transactionId: 'TXN-001177',
-      amount: '€15.00'
-    },
+  // Fetch notifications from database
+  const fetchNotifications = async () => {
+    setIsLoading(true);
+    try {
+      console.log('📢 Fetching notifications from database...');
+      const response = await apiService.getNotifications({ limit: 100 });
+      
+      if (response.success && response.notifications) {
+        console.log(`✅ Loaded ${response.notifications.length} notifications`);
+        
+        // Transform backend notifications to alerts format
+        const formattedAlerts = response.notifications.map(notif => ({
+          id: notif._id,
+          title: notif.title || 'Notification',
+          description: notif.message || notif.text,
+          severity: notif.type || 'medium',
+          time: formatTime(notif.timestamp || notif.created_at),
+          transactionId: notif.transaction_id || 'N/A',
+          amount: notif.amount ? `$${notif.amount.toFixed(2)}` : 'N/A',
+          read: notif.read || false
+        }));
+        
+        setAlerts(formattedAlerts);
+        
+        // Calculate stats
+        const activeCount = formattedAlerts.filter(a => !a.read && a.severity === 'high').length;
+        const resolvedCount = formattedAlerts.filter(a => a.read).length;
+        const pendingCount = formattedAlerts.filter(a => !a.read && a.severity === 'medium').length;
+        const dismissedCount = formattedAlerts.filter(a => a.read && a.severity === 'low').length;
+        
+        setStats({
+          active: activeCount,
+          resolved: resolvedCount,
+          pending: pendingCount,
+          dismissed: dismissedCount
+        });
+      }
+    } catch (error) {
+      console.error('❌ Error fetching notifications:', error);
+      toast.showError(`Failed to load notifications: ${error.message}`, 5000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const formatTime = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    
+    if (diffSec < 60) return `${diffSec}s ago`;
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return date.toLocaleDateString();
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const alertStats = [
+    { label: 'Active', value: stats.active.toString(), icon: AlertTriangle, color: 'danger' },
+    { label: 'Resolved', value: stats.resolved.toString(), icon: CheckCircle, color: 'success' },
+    { label: 'Pending', value: stats.pending.toString(), icon: Clock, color: 'warning' },
+    { label: 'Dismissed', value: stats.dismissed.toString(), icon: XCircle, color: 'default' },
   ];
 
   const colorClasses = {
@@ -72,9 +107,20 @@ const Alerts = () => {
         <main className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
             {/* Page Header */}
-            <div>
-              <h1 className="text-3xl font-bold bg-gradient-to-r from-red-600 via-orange-600 to-red-600 bg-clip-text text-transparent">Fraud Alerts</h1>
-              <p className="text-gray-600">Monitor and respond to suspicious activities</p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-red-600 via-orange-600 to-red-600 bg-clip-text text-transparent">Fraud Alerts</h1>
+                <p className="text-gray-600">Monitor and respond to suspicious activities</p>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={fetchNotifications}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
             </div>
 
             {/* Alert Stats */}
@@ -94,15 +140,41 @@ const Alerts = () => {
               ))}
             </div>
 
+            {/* Loading State */}
+            {isLoading && alerts.length === 0 && (
+              <Card>
+                <div className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mb-4"></div>
+                    <p className="text-gray-600">Loading alerts...</p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
             {/* Alert List */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Active Alerts</h2>
-              <div className="space-y-4">
-                {mockAlerts.map((alert, index) => (
-                  <FraudAlert key={index} alert={alert} />
-                ))}
+            {!isLoading && (
+              <div>
+                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  Active Alerts ({alerts.length})
+                </h2>
+                {alerts.length === 0 ? (
+                  <Card>
+                    <div className="text-center py-12 text-gray-500">
+                      <AlertTriangle className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p className="text-lg font-semibold">No alerts yet</p>
+                      <p className="text-sm">Alerts will appear when fraud is detected</p>
+                    </div>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {alerts.map((alert) => (
+                      <FraudAlert key={alert.id} alert={alert} />
+                    ))}
+                  </div>
+                )}
               </div>
-            </div>
+            )}
           </div>
         </main>
       </div>

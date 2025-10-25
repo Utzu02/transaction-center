@@ -90,7 +90,7 @@ const LiveMonitorControl = ({ onChange }) => {
             value={streamUrl}
             onChange={(e) => setStreamUrl(e.target.value)}
             placeholder={connectionType === 'sse' ? 'https://95.217.75.14:8443/stream' : 'localhost:8080/stream'}
-            className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/80"
+            className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/80 placeholder:text-gray-400"
           />
           <p className="mt-1 text-xs text-gray-500">
             {connectionType === 'sse' 
@@ -110,7 +110,7 @@ const LiveMonitorControl = ({ onChange }) => {
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
               placeholder="Enter your API key (X-API-Key header)"
-              className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/80 font-mono text-sm"
+              className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/80 font-mono text-sm placeholder:text-gray-400 placeholder:font-sans"
             />
             <p className="mt-1 text-xs text-gray-500">
               Required for authenticating with the hackathon stream

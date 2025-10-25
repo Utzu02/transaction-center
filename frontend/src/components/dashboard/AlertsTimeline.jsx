@@ -127,22 +127,22 @@ const AlertsTimeline = ({ transactions = [] }) => {
 
           <div className="mt-4 grid grid-cols-3 gap-4">
             <div className="text-center p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-              <div className="text-2xl font-bold text-yellow-600">
+              <p className="text-2xl font-bold text-yellow-600">
                 {stats.peak}
-              </div>
-              <div className="text-xs text-gray-600 mt-1">Peak Alerts</div>
+              </p>
+              <p className="text-xs text-gray-600 mt-1">Peak Alerts</p>
             </div>
             <div className="text-center p-3 bg-primary-50 rounded-lg border border-primary-200">
-              <div className="text-2xl font-bold text-primary-600">
+              <p className="text-2xl font-bold text-primary-600">
                 {stats.avg}
-              </div>
-              <div className="text-xs text-gray-600 mt-1">Avg per 15min</div>
+              </p>
+              <p className="text-xs text-gray-600 mt-1">Avg per 15min</p>
             </div>
             <div className="text-center p-3 bg-danger-50 rounded-lg border border-danger-200">
-              <div className="text-2xl font-bold text-danger-600">
+              <p className="text-2xl font-bold text-danger-600">
                 {stats.current}
-              </div>
-              <div className="text-xs text-gray-600 mt-1">Current (15min)</div>
+              </p>
+              <p className="text-xs text-gray-600 mt-1">Current (15min)</p>
             </div>
           </div>
         </>

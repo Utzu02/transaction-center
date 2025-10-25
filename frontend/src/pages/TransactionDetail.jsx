@@ -1,62 +1,117 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, AlertTriangle, CheckCircle, XCircle, Calendar, CreditCard, MapPin, User, Shield } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, CheckCircle, XCircle, Calendar, CreditCard, MapPin, User, Shield, RefreshCw } from 'lucide-react';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
 import Badge from '../components/common/Badge';
+import { useToast } from '../components/common/ToastContainer';
+import apiService from '../services/api';
 
 const TransactionDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
+  const [transaction, setTransaction] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Mock data based on real CSV structure - în producție, aici ar veni un API call cu ID-ul
-  const transaction = {
-    id: id,
-    merchant: 'Cummings LLC',
-    merchantCategory: 'Gas & Transport',
-    amount: '$92.40',
-    status: 'completed',
-    riskScore: 15,
-    date: '2025-08-26 00:00:00',
-    transNum: 'bf430f30cc1acfdbd34526a04372fc9f',
-    
-    // Card details
-    cardNumber: '4616481889874315776',
-    cardLast4: '5776',
-    cardType: 'Visa',
-    
-    // Customer details
-    customerName: 'Matthew Moore',
-    customerGender: 'Male',
-    customerJob: 'Financial Risk Analyst',
-    customerDob: '1999-04-05',
-    customerEmail: 'matthew.moore@example.com',
-    
-    // Location details
-    street: '13291 Michele Locks Suite 759',
-    city: 'Bakersfield',
-    state: 'CA',
-    zip: '93304',
-    country: 'United States',
-    lat: '35.3396',
-    long: '-119.0218',
-    cityPop: '520,197',
-    
-    // Merchant location
-    merchLat: '34.660162',
-    merchLong: '-118.516677',
-    
-    // Additional details
-    category: 'Gas & Transport',
-    profile: 'adults_2550_male_urban',
-    unixTime: '1756155600',
-    processingTime: '0.8s',
-    currency: 'USD',
-    fee: '$0.92',
-    netAmount: '$91.48',
-  };
+  // Fetch transaction from backend
+  useEffect(() => {
+    const fetchTransaction = async () => {
+      setIsLoading(true);
+      try {
+        const response = await apiService.getTransaction(id);
+        
+        if (response.success && response.transaction) {
+          const tx = response.transaction;
+          // Transform backend data to frontend format
+          setTransaction({
+            id: tx.trans_num || tx.id,
+            merchant: tx.merchant || 'Unknown',
+            merchantCategory: tx.category || 'Unknown',
+            amount: tx.amt ? `$${tx.amt.toFixed(2)}` : '$0.00',
+            status: tx.status || 'completed',
+            riskScore: tx.risk_score || 0,
+            date: tx.trans_date && tx.trans_time ? `${tx.trans_date} ${tx.trans_time}` : tx.created_at,
+            transNum: tx.trans_num || tx.id,
+            
+            // Card details
+            cardNumber: tx.cc_num || '',
+            cardLast4: tx.cc_num ? tx.cc_num.slice(-4) : '',
+            cardType: 'Card',
+            
+            // Customer details
+            customerName: tx.first && tx.last ? `${tx.first} ${tx.last}` : (tx.customer || 'Unknown'),
+            customerGender: tx.gender === 'M' ? 'Male' : tx.gender === 'F' ? 'Female' : 'Unknown',
+            customerJob: tx.job || 'Unknown',
+            customerDob: tx.dob || 'Unknown',
+            customerEmail: '', // Not in database
+            
+            // Location details
+            street: tx.street || '',
+            city: tx.city || '',
+            state: tx.state || '',
+            zip: tx.zip || '',
+            country: 'United States',
+            lat: tx.lat || '',
+            long: tx.long || '',
+            cityPop: tx.city_pop ? tx.city_pop.toLocaleString() : '',
+            
+            // Merchant location
+            merchLat: tx.merch_lat || '',
+            merchLong: tx.merch_long || '',
+            
+            // Additional details
+            category: tx.category || 'Unknown',
+            profile: '', // Not in database
+            unixTime: tx.unix_time || '',
+            processingTime: '', // Not in database
+            currency: 'USD',
+            fee: '', // Not in database
+            netAmount: '', // Not in database
+          });
+        } else {
+          toast.showError('Transaction not found', 3000);
+          navigate('/transactions');
+        }
+      } catch (error) {
+        console.error('Error fetching transaction:', error);
+        toast.showError('Failed to load transaction details', 5000);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
+    if (id) {
+      fetchTransaction();
+    }
+  }, [id, navigate, toast]);
+
+  if (!transaction && !isLoading) {
+    return (
+      <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-50">
+        <Sidebar />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Header />
+          <main className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-6xl mx-auto flex items-center justify-center h-full">
+              <div className="text-center">
+                <XCircle className="w-12 h-12 mx-auto mb-4 text-red-600" />
+                <p className="text-gray-600">Transaction not found</p>
+                <Button onClick={() => navigate('/transactions')} className="mt-4">
+                  Back to Transactions
+                </Button>
+              </div>
+            </div>
+          </main>
+        </div>
+      </div>
+    );
+  }
+
+  const displayTransaction = transaction;
+  
   const getStatusInfo = (status) => {
     if (status === 'completed') {
       return {
@@ -103,7 +158,7 @@ const TransactionDetail = () => {
               className="mb-4"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Transactions
+              <p>Back to Transactions</p>
             </Button>
 
             {/* Header */}

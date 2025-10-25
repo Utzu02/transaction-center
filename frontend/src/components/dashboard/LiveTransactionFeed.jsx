@@ -123,15 +123,15 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
 
                 <div className="flex flex-col gap-2 ml-4">
                   <div className="text-right">
-                    <div className="text-xs text-gray-500 mb-1">Risk Score</div>
-                    <div className={`text-2xl font-bold ${
+                    <p className="text-xs text-gray-500 mb-1">Risk Score</p>
+                    <p className={`text-2xl font-bold ${
                       transaction.riskScore >= 70 ? 'text-red-600' :
                       transaction.riskScore >= 50 ? 'text-orange-600' :
                       transaction.riskScore >= 30 ? 'text-yellow-600' :
                       'text-green-600'
                     }`}>
                       {transaction.riskScore}
-                    </div>
+                    </p>
                   </div>
                   
                   <button

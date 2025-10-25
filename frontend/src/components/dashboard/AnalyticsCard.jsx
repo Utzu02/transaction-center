@@ -26,7 +26,7 @@ const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip })
                 </button>
                 <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-3 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-300 ease-out transform group-hover:-translate-y-1 w-72 p-4 bg-gradient-to-br from-blue-600 via-blue-700 to-cyan-600 text-white text-sm font-medium leading-relaxed rounded-xl shadow-2xl border-2 border-blue-400/30 z-[100] pointer-events-none whitespace-normal backdrop-blur-sm">
                   <div className="relative z-10">
-                    {tooltip}
+                    <p className="text-center">{tooltip}</p>
                   </div>
                   {/* Glossy overlay effect */}
                   <div className="absolute inset-0 bg-gradient-to-b from-white/10 to-transparent rounded-xl pointer-events-none"></div>

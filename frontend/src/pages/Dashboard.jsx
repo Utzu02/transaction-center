@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CreditCard, AlertTriangle, TrendingUp, Upload, Play, Square } from 'lucide-react';
+import { CreditCard, AlertTriangle, TrendingUp, Upload, Play, Square, Radio, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../components/common/ToastContainer';
 import Sidebar from '../components/dashboard/Sidebar';
@@ -8,8 +8,10 @@ import AnalyticsCard from '../components/dashboard/AnalyticsCard';
 import TransactionList from '../components/dashboard/TransactionList';
 import LiveMonitor from '../components/dashboard/LiveMonitor';
 import Button from '../components/common/Button';
+import Card from '../components/common/Card';
 import websocketService from '../services/websocket';
 import sseService from '../services/sse';
+import apiService from '../services/api';
 import { formatTransaction } from '../utils/fraudDetection';
 
 const Dashboard = () => {
@@ -33,6 +35,41 @@ const Dashboard = () => {
     detectionRate: 0
   });
   const [processedTransactions, setProcessedTransactions] = useState([]);
+  const [dbTransactions, setDbTransactions] = useState([]);
+  const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
+
+  // Fetch transactions from database
+  const fetchDatabaseTransactions = async () => {
+    setIsLoadingTransactions(true);
+    try {
+      console.log('📊 Fetching transactions from database...');
+      const response = await apiService.getTransactions({ limit: 100, sort_order: -1 });
+      
+      if (response.success && response.transactions) {
+        console.log(`✅ Loaded ${response.transactions.length} transactions from database`);
+        
+        // Transform backend data to frontend format
+        const formatted = response.transactions.map(tx => ({
+          id: tx.trans_num || tx.id,
+          merchant: tx.merchant || 'Unknown',
+          amount: tx.amt || 0,
+          status: tx.status || 'completed',
+          riskScore: tx.risk_score || 0,
+          timestamp: tx.unix_time || Math.floor(new Date(tx.created_at).getTime() / 1000),
+          category: tx.category || 'Unknown',
+          customer: tx.first && tx.last ? `${tx.first} ${tx.last}` : 'Unknown',
+          location: tx.city && tx.state ? `${tx.city}, ${tx.state}` : 'Unknown',
+          isFraud: tx.is_fraud || false
+        }));
+        
+        setDbTransactions(formatted);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching database transactions:', error);
+    } finally {
+      setIsLoadingTransactions(false);
+    }
+  };
 
   // Handle start monitoring
   const handleStartMonitoring = () => {
@@ -101,6 +138,12 @@ const Dashboard = () => {
         console.error('Failed to load saved config:', e);
       }
     }
+  }, []);
+
+  // Fetch database transactions on mount
+  useEffect(() => {
+    fetchDatabaseTransactions();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -179,12 +222,15 @@ const Dashboard = () => {
     sseService.subscribe('connection', handleConnection);
     sseService.subscribe('transaction', handleTransaction);
 
-    // Cleanup on unmount
+    // Cleanup on unmount - but don't auto-disconnect, only unsubscribe
     return () => {
-      websocketService.disconnect();
-      sseService.disconnect();
+      websocketService.unsubscribe('connection', handleConnection);
+      websocketService.unsubscribe('transaction', handleTransaction);
+      sseService.unsubscribe('connection', handleConnection);
+      sseService.unsubscribe('transaction', handleTransaction);
     };
-  }, [connectionType]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionType]); // Only re-run when connectionType changes
 
 
   const handleImportCSV = (event) => {
@@ -268,6 +314,9 @@ const Dashboard = () => {
         });
 
         toast.showSuccess(`Successfully imported ${imported} transactions`, 3000);
+        
+        // Refresh database transactions in case any were added manually
+        fetchDatabaseTransactions();
       } catch (error) {
         console.error('CSV import error:', error);
         toast.showError('Failed to import CSV file. Please check the format.', 4000);
@@ -307,9 +356,20 @@ const Dashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-3xl font-bold text-gray-900 mb-2">Real-Time Fraud Detection Dashboard</h1>
-                <p className="text-gray-600">AI/ML SIEM for POS Fraud Alerting System - Live Monitor</p>
+                <p className="text-gray-600">SIEM for POS Fraud Alerting System - Live Monitor</p>
               </div>
               <div className="flex items-center gap-3">
+                {/* Refresh Transactions Button */}
+                <Button
+                  variant="secondary"
+                  onClick={fetchDatabaseTransactions}
+                  disabled={isLoadingTransactions}
+                  className="flex items-center gap-2"
+                >
+                  <RefreshCw className={`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
+                  Refresh
+                </Button>
+                
                 {/* Import CSV Button */}
                 <label htmlFor="csv-import">
                   <input
@@ -328,38 +388,64 @@ const Dashboard = () => {
                     Import CSV
                   </Button>
                 </label>
-                
-                {/* Start/Stop Monitoring Buttons */}
-                {isConnecting ? (
-                  <Button
-                    variant="success"
-                    disabled
-                    className="flex items-center gap-2"
-                  >
-                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                    Monitoring...
-                  </Button>
-                ) : isMonitoring ? (
-                  <Button
-                    variant="danger"
-                    onClick={handleStopMonitoring}
-                    className="flex items-center gap-2"
-                  >
-                    <Square className="w-4 h-4" />
-                    Stop Monitoring
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    onClick={handleStartMonitoring}
-                    className="flex items-center gap-2"
-                  >
-                    <Play className="w-4 h-4" />
-                    Start Monitoring
-                  </Button>
-                )}
               </div>
             </div>
+
+            {/* External Stream Connection Card */}
+            <Card>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`p-3 rounded-xl ${isMonitoring ? 'bg-green-100' : 'bg-gray-100'}`}>
+                    <Radio className={`w-6 h-6 ${isMonitoring ? 'text-green-600' : 'text-gray-600'}`} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">External Hackathon Stream</h3>
+                    <p className="text-sm text-gray-600">
+                      {isMonitoring 
+                        ? `Connected to ${streamConfig.url}` 
+                        : 'Connect to receive live transactions from the hackathon server'}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  {isConnecting ? (
+                    <Button
+                      variant="success"
+                      disabled
+                      className="flex items-center gap-2"
+                    >
+                      <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                      Connecting...
+                    </Button>
+                  ) : isMonitoring ? (
+                    <Button
+                      variant="danger"
+                      onClick={handleStopMonitoring}
+                      className="flex items-center gap-2"
+                    >
+                      <Square className="w-4 h-4" />
+                      Disconnect Stream
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="primary"
+                      onClick={handleStartMonitoring}
+                      className="flex items-center gap-2"
+                    >
+                      <Play className="w-4 h-4" />
+                      Connect to Stream
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {!streamConfig.url && !isMonitoring && (
+                <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    ⚠️ No stream URL configured. Go to <button onClick={() => navigate('/settings')} className="underline font-semibold">Settings</button> to configure the external stream.
+                  </p>
+                </div>
+              )}
+            </Card>
 
             {/* Live Monitor Stats */}
             {isMonitoring && <LiveMonitor connectionStatus={connectionStatus} stats={liveStats} />}
@@ -368,21 +454,25 @@ const Dashboard = () => {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnalyticsCard
                 title="Total Transactions"
-                value={liveStats.processed || "0"}
+                value={(dbTransactions.length + liveStats.processed).toLocaleString()}
                 icon={CreditCard}
                 color="primary"
-                tooltip="Total transactions processed and analyzed in real-time."
+                tooltip="Total transactions from database and live stream."
               />
               <AnalyticsCard
                 title="Fraud Detected"
-                value={liveStats.fraudDetected || "0"}
+                value={(dbTransactions.filter(t => t.isFraud).length + liveStats.fraudDetected).toLocaleString()}
                 icon={AlertTriangle}
                 color="danger"
                 tooltip="Fraudulent transactions flagged by AI/ML system based on risk patterns."
               />
               <AnalyticsCard
                 title="Detection Rate"
-                value={`${liveStats.detectionRate || "0"}%`}
+                value={`${(() => {
+                  const totalTx = dbTransactions.length + liveStats.processed;
+                  const totalFraud = dbTransactions.filter(t => t.isFraud).length + liveStats.fraudDetected;
+                  return totalTx > 0 ? ((totalFraud / totalTx) * 100).toFixed(1) : "0";
+                })()}%`}
                 icon={TrendingUp}
                 color="success"
                 tooltip="Percentage of transactions identified as fraud. Target: high accuracy, low false positives."
@@ -391,18 +481,32 @@ const Dashboard = () => {
 
             {/* Transaction List */}
             <TransactionList 
-              transactions={processedTransactions.map(t => ({
-                id: t.id,
-                customer: t.customer,
-                merchant: t.merchant,
-                amount: `$${t.amount.toFixed(2)}`,
-                category: t.category,
-                location: t.location,
-                riskScore: t.riskScore,
-                status: t.isFraud ? 'blocked' : 'completed',
-                date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()
-              }))}
-              maxRows={5}
+              transactions={[
+                // Merge database transactions with live stream transactions
+                ...dbTransactions.map(t => ({
+                  id: t.id,
+                  customer: t.customer,
+                  merchant: t.merchant,
+                  amount: `$${t.amount.toFixed(2)}`,
+                  category: t.category,
+                  location: t.location,
+                  riskScore: t.riskScore,
+                  status: t.status,
+                  date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()
+                })),
+                ...processedTransactions.map(t => ({
+                  id: t.id,
+                  customer: t.customer,
+                  merchant: t.merchant,
+                  amount: `$${t.amount.toFixed(2)}`,
+                  category: t.category,
+                  location: t.location,
+                  riskScore: t.riskScore,
+                  status: t.isFraud ? 'blocked' : 'completed',
+                  date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()
+                }))
+              ].sort((a, b) => new Date(b.date) - new Date(a.date))}
+              maxRows={10}
               showExport={true}
               showViewMore={true}
             />

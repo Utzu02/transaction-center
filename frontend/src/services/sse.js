@@ -108,11 +108,15 @@ const sseService = {
       subscribers[eventType] = [];
     }
     subscribers[eventType].push(callback);
+    return () => sseService.unsubscribe(eventType, callback); // Return cleanup function
   },
 
   unsubscribe: (eventType, callback) => {
     if (subscribers[eventType]) {
-      subscribers[eventType] = subscribers[eventType].filter(cb => cb !== callback);
+      const index = subscribers[eventType].indexOf(callback);
+      if (index > -1) {
+        subscribers[eventType].splice(index, 1);
+      }
     }
   },
 
