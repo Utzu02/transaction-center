@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Activity, DollarSign, Users, CreditCard } from 'lucide-react';
+import { Activity, DollarSign, Users, CreditCard, TrendingUp, Shield } from 'lucide-react';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import Card from '../components/common/Card';
@@ -110,11 +110,6 @@ const Analytics = () => {
               <p className="text-gray-600">Real-time fraud analysis and comprehensive insights</p>
             </div>
 
-            {/* Business Intelligence - Hackathon Requirements */}
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Business Intelligence</h2>
-              <p className="text-gray-600">Real-time fraud analysis answering key business questions</p>
-            </div>
 
             {/* Top 5 Fraud Patterns & Alerts Timeline */}
             <div className="grid lg:grid-cols-2 gap-6">
@@ -123,81 +118,139 @@ const Analytics = () => {
             </div>
 
             {/* Age Segment Analysis & Live Transaction Feed */}
-            <div className="grid lg:grid-cols-2 gap-6">
+            <div className="grid lg:grid-cols-2 gap-6 items-start">
               <AgeSegmentAnalysis transactions={processedTransactions} />
               <LiveTransactionFeed transactions={processedTransactions.slice(-20)} />
             </div>
 
             {/* Performance Metrics for Live Checker */}
-            <PerformanceMetrics transactions={processedTransactions} liveStats={liveStats} />
-
-            {/* Divider */}
-            <div className="border-t-2 border-gray-200 my-8"></div>
+            {/* <PerformanceMetrics transactions={processedTransactions} liveStats={liveStats} /> */}
 
             {/* Historical Analytics */}
-            <div className="mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">Historical Analytics</h2>
-              <p className="text-gray-600">Long-term trends and statistical analysis</p>
-            </div>
+            <Card>
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">Historical Analytics</h2>
+                <p className="text-gray-600">Long-term trends and statistical analysis</p>
+              </div>
 
-            {/* Metrics Grid */}
-            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {metrics.map((metric, index) => (
-                <Card key={index}>
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600 mb-1">{metric.title}</p>
-                      <h3 className="text-3xl font-bold text-gray-900">{metric.value}</h3>
-                    </div>
-                    <div className={`p-3 rounded-lg bg-${metric.color}-50 text-${metric.color}-600`}>
-                      <metric.icon className="w-6 h-6" />
+              {/* Metrics Grid */}
+              <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                {metrics.map((metric, index) => (
+                  <div key={index} className="bg-white/80 backdrop-blur-sm rounded-2xl shadow-lg border border-gray-100 p-6 hover:shadow-2xl hover:border-blue-200 transition-all duration-300">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600 mb-1">{metric.title}</p>
+                        <h3 className="text-3xl font-bold text-gray-900">{metric.value}</h3>
+                      </div>
+                      <div className={`p-3 rounded-lg bg-${metric.color}-50 text-${metric.color}-600`}>
+                        <metric.icon className="w-6 h-6" />
+                      </div>
                     </div>
                   </div>
-                </Card>
-              ))}
-            </div>
+                ))}
+              </div>
 
-            {/* Charts */}
-            <div className="grid lg:grid-cols-2 gap-6">
-              <Card>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Transaction Trends</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <AreaChart data={monthlyData}>
-                    <defs>
-                      <linearGradient id="colorTrans" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis dataKey="month" stroke="#888" />
-                    <YAxis stroke="#888" />
-                    <Tooltip />
-                    <Area type="monotone" dataKey="transactions" stroke="#0ea5e9" fillOpacity={1} fill="url(#colorTrans)" />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </Card>
+              {/* Charts */}
+              <div className="grid lg:grid-cols-2 gap-6">
+                {/* Transaction Trends */}
+                <div className="bg-gradient-to-br from-blue-50 via-white to-cyan-50 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-blue-200 p-6 hover:shadow-2xl hover:border-blue-300 transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-xl shadow-lg">
+                      <TrendingUp className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent">
+                        Transaction Trends
+                      </h3>
+                      <p className="text-xs text-gray-600">Monthly overview</p>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <AreaChart data={monthlyData}>
+                      <defs>
+                        <linearGradient id="colorTrans" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8}/>
+                          <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                      <XAxis 
+                        dataKey="month" 
+                        stroke="#6366f1" 
+                        style={{ fontSize: '12px', fontWeight: '600' }}
+                      />
+                      <YAxis 
+                        stroke="#6366f1" 
+                        style={{ fontSize: '12px', fontWeight: '600' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                          border: '2px solid #0ea5e9',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Area 
+                        type="monotone" 
+                        dataKey="transactions" 
+                        stroke="#0ea5e9" 
+                        strokeWidth={3}
+                        fillOpacity={1} 
+                        fill="url(#colorTrans)" 
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
 
-              <Card>
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Risk Distribution</h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={riskDistribution} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                    <XAxis type="number" stroke="#888" />
-                    <YAxis dataKey="risk" type="category" stroke="#888" />
-                    <Tooltip />
-                    <Bar dataKey="count" fill="#0ea5e9">
-                      {riskDistribution.map((entry, index) => (
-                        <Cell 
-                          key={`cell-${index}`} 
-                          fill={entry.risk === 'High' ? '#ef4444' : entry.risk === 'Medium' ? '#f59e0b' : '#22c55e'} 
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </Card>
-            </div>
+                {/* Risk Distribution */}
+                <div className="bg-gradient-to-br from-purple-50 via-white to-pink-50 backdrop-blur-sm rounded-2xl shadow-xl border-2 border-purple-200 p-6 hover:shadow-2xl hover:border-purple-300 transition-all duration-300">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl shadow-lg">
+                      <Shield className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+                        Risk Distribution
+                      </h3>
+                      <p className="text-xs text-gray-600">Security levels</p>
+                    </div>
+                  </div>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <BarChart data={riskDistribution} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f3e8ff" />
+                      <XAxis 
+                        type="number" 
+                        stroke="#9333ea" 
+                        style={{ fontSize: '12px', fontWeight: '600' }}
+                      />
+                      <YAxis 
+                        dataKey="risk" 
+                        type="category" 
+                        stroke="#9333ea"
+                        style={{ fontSize: '12px', fontWeight: '600' }}
+                      />
+                      <Tooltip 
+                        contentStyle={{ 
+                          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                          border: '2px solid #9333ea',
+                          borderRadius: '12px',
+                          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                        }}
+                      />
+                      <Bar dataKey="count" radius={[0, 8, 8, 0]}>
+                        {riskDistribution.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={entry.risk === 'High' ? '#ef4444' : entry.risk === 'Medium' ? '#f59e0b' : '#22c55e'} 
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </Card>
           </div>
         </main>
       </div>

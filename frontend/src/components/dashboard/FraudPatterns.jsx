@@ -65,7 +65,10 @@ const FraudPatterns = ({ transactions = [] }) => {
     <Card>
       <div className="flex items-center justify-between mb-4">
         <div>
-          <h3 className="text-lg font-bold text-gray-900">Top 5 Fraud Patterns</h3>
+          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+            <TrendingUp className="w-5 h-5 text-blue-600" />
+            Top 5 Fraud Patterns
+          </h3>
           <p className="text-sm text-gray-600">
             Last {getTimeframeLabel()} • {totalCount} fraud cases
           </p>
@@ -81,7 +84,6 @@ const FraudPatterns = ({ transactions = [] }) => {
             <option value="28800">8h</option>
             <option value="86400">1d</option>
           </select>
-          <TrendingUp className="w-5 h-5 text-blue-600" />
         </div>
       </div>
 
