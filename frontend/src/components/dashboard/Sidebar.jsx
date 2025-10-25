@@ -4,7 +4,6 @@ import {
   AlertTriangle, 
   BarChart3, 
   Shield,
-  ArrowLeft,
   Settings
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -39,7 +38,7 @@ const Sidebar = () => {
       <div className="p-6 border-b border-white/10">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-3 mb-4 w-full hover:opacity-80 transition-opacity group"
+          className="flex items-center gap-3 w-full hover:opacity-80 transition-opacity group"
         >
           <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2 rounded-xl shadow-lg group-hover:shadow-blue-500/50 transition-shadow">
             <Shield className="w-6 h-6 text-white" />
@@ -48,13 +47,6 @@ const Sidebar = () => {
             <h1 className="text-xl font-display font-bold text-white">FraudDetect</h1>
             <p className="text-xs text-gray-400">SIEM Platform</p>
           </div>
-        </button>
-        <button
-          onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-sm text-gray-400 hover:text-blue-400 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
         </button>
       </div>
       
@@ -90,7 +82,7 @@ const Sidebar = () => {
       {/* Bottom gradient */}
       <div className="p-4 border-t border-white/10">
         <div className="text-center text-xs text-gray-500">
-          Powered by AI/ML
+          Powered by Rafallos
         </div>
       </div>
     </aside>
