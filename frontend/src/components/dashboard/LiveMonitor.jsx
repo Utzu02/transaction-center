@@ -24,7 +24,9 @@ const LiveMonitor = ({ connectionStatus, stats }) => {
           <Badge variant="success" className="flex items-center gap-2">
             <Wifi className="w-4 h-4" />
             Connected
-            {pulse && <span className="w-2 h-2 bg-success-600 rounded-full animate-ping"></span>}
+            <span className="relative w-2 h-2">
+              <span className={`absolute inset-0 bg-success-600 rounded-full ${pulse ? 'opacity-75' : 'opacity-100'} transition-opacity duration-500`}></span>
+            </span>
           </Badge>
         ) : (
           <Badge variant="danger" className="flex items-center gap-2">
@@ -58,11 +60,11 @@ const LiveMonitor = ({ connectionStatus, stats }) => {
       <div className="mt-4 p-3 bg-gray-50 rounded-lg">
         <div className="flex items-center justify-between text-sm">
           <span className="text-gray-600">Avg Response Time</span>
-          <span className="font-semibold text-gray-900">{stats.avgResponseTime}ms</span>
+          <span className="font-semibold text-gray-900">{stats.avgResponseTime || 0}s</span>
         </div>
         <div className="mt-2 flex items-center justify-between text-sm">
           <span className="text-gray-600">Detection Rate</span>
-          <span className="font-semibold text-gray-900">{stats.detectionRate}%</span>
+          <span className="font-semibold text-gray-900">{stats.detectionRate || 0}%</span>
         </div>
       </div>
     </Card>

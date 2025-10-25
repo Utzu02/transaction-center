@@ -1,6 +1,5 @@
-import { Bell, User, Search } from 'lucide-react';
-import Button from '../common/Button';
-import Badge from '../common/Badge';
+import { User, Search } from 'lucide-react';
+import NotificationDropdown from './NotificationDropdown';
 
 const Header = () => {
   return (
@@ -22,10 +21,7 @@ const Header = () => {
           {/* Actions */}
           <div className="flex items-center gap-4 ml-6">
             {/* Notifications */}
-            <button className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors">
-              <Bell className="w-6 h-6" />
-              <span className="absolute top-1 right-1 w-2 h-2 bg-danger-500 rounded-full"></span>
-            </button>
+            <NotificationDropdown />
             
             {/* User Menu */}
             <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
@@ -45,4 +41,3 @@ const Header = () => {
 };
 
 export default Header;
-

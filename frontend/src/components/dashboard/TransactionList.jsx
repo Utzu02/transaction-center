@@ -1,11 +1,13 @@
-import { Eye, Download } from 'lucide-react';
+import { useState } from 'react';
+import { Eye, Download, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../common/Card';
 import Badge from '../common/Badge';
 import Button from '../common/Button';
 
-const TransactionList = ({ transactions = [], filter = 'all' }) => {
+const TransactionList = ({ transactions = [], filter = 'all', showExport = true, showViewMore = true, maxRows = null }) => {
   const navigate = useNavigate();
+  const [exportFilter, setExportFilter] = useState('all');
   
   // Mock data based on real CSV structure
   const mockTransactions = [
@@ -106,6 +108,9 @@ const TransactionList = ({ transactions = [], filter = 'all' }) => {
   }
   // If filter === 'all', show all data
 
+  // Limit rows for display
+  const displayData = maxRows ? data.slice(0, maxRows) : data;
+
   const getStatusBadge = (status) => {
     const statusMap = {
       completed: { variant: 'success', label: 'Accepted' },
@@ -120,20 +125,99 @@ const TransactionList = ({ transactions = [], filter = 'all' }) => {
     return 'text-success-600 bg-success-50';
   };
 
+  const formatDateTime = (dateString) => {
+    if (!dateString) return 'Just now';
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffSec = Math.floor(diffMs / 1000);
+    
+    // If less than 60 seconds ago
+    if (diffSec < 60) return `${diffSec}s ago`;
+    // If less than 60 minutes ago
+    if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
+    // If less than 24 hours ago
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    
+    // Otherwise show date and time
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const handleExportCSV = () => {
+    // Filter data based on export selection
+    let exportData = data;
+    if (exportFilter === 'accepted') {
+      exportData = data.filter(t => t.status === 'completed');
+    } else if (exportFilter === 'blocked') {
+      exportData = data.filter(t => t.status === 'blocked');
+    }
+
+    // CSV headers
+    const headers = ['Date/Time', 'Customer', 'Merchant', 'Amount', 'Category', 'Location', 'Risk Score', 'Status'];
+    
+    // CSV rows
+    const rows = exportData.map(t => [
+      t.date || new Date().toISOString(),
+      t.customer,
+      t.merchant,
+      t.amount,
+      t.category,
+      t.location,
+      t.riskScore,
+      getStatusBadge(t.status).label
+    ]);
+
+    // Create CSV content
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+    ].join('\n');
+
+    // Create blob and download
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `transactions_${exportFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <Card>
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <h2 className="text-xl font-bold text-gray-900">Recent Transactions</h2>
-        <Button variant="ghost" size="sm">
-          <Download className="w-4 h-4" />
-          Export CSV
-        </Button>
+        {showExport && (
+          <div className="flex items-center gap-2">
+            <select
+              value={exportFilter}
+              onChange={(e) => setExportFilter(e.target.value)}
+              className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="all">Export All</option>
+              <option value="accepted">Export Accepted</option>
+              <option value="blocked">Export Blocked</option>
+            </select>
+            <Button variant="secondary" size="sm" onClick={handleExportCSV}>
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Date/Time</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Customer</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Merchant</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Amount</th>
@@ -145,10 +229,13 @@ const TransactionList = ({ transactions = [], filter = 'all' }) => {
             </tr>
           </thead>
           <tbody>
-            {data.map((transaction, index) => {
+            {displayData.map((transaction) => {
               const statusInfo = getStatusBadge(transaction.status);
               return (
-                <tr key={index} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <td className="py-4 px-4">
+                    <span className="text-xs text-gray-500">{formatDateTime(transaction.date)}</span>
+                  </td>
                   <td className="py-4 px-4">
                     <span className="text-sm font-semibold text-gray-900">{transaction.customer}</span>
                   </td>
@@ -189,9 +276,21 @@ const TransactionList = ({ transactions = [], filter = 'all' }) => {
           </tbody>
         </table>
       </div>
+
+      {showViewMore && maxRows && data.length > maxRows && (
+        <div className="mt-4 pt-4 border-t border-gray-200 text-center">
+          <Button 
+            variant="outline" 
+            onClick={() => navigate('/transactions')}
+            className="w-full"
+          >
+            View All Transactions ({data.length})
+            <ChevronRight className="w-4 h-4 ml-2" />
+          </Button>
+        </div>
+      )}
     </Card>
   );
 };
 
 export default TransactionList;
-

@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { CreditCard, AlertTriangle, TrendingUp } from 'lucide-react';
+import { useToast } from '../components/common/ToastContainer';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import AnalyticsCard from '../components/dashboard/AnalyticsCard';
@@ -7,15 +8,16 @@ import TransactionList from '../components/dashboard/TransactionList';
 import FraudAlert from '../components/dashboard/FraudAlert';
 import LiveMonitor from '../components/dashboard/LiveMonitor';
 import LiveMonitorControl from '../components/dashboard/LiveMonitorControl';
-import FraudPatterns from '../components/dashboard/FraudPatterns';
-import AgeSegmentAnalysis from '../components/dashboard/AgeSegmentAnalysis';
-import AlertsTimeline from '../components/dashboard/AlertsTimeline';
 import Card from '../components/common/Card';
 import websocketService from '../services/websocket';
 import sseService from '../services/sse';
+import { formatTransaction } from '../utils/fraudDetection';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
+  const toast = useToast();
+  const lastNotificationRef = useRef(0);
+  
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [connectionType, setConnectionType] = useState('websocket');
@@ -27,6 +29,7 @@ const Dashboard = () => {
     avgResponseTime: 0,
     detectionRate: 0
   });
+  const [processedTransactions, setProcessedTransactions] = useState([]);
 
   useEffect(() => {
     // Subscribe to connection events for both services
@@ -38,26 +41,61 @@ const Dashboard = () => {
     const handleTransaction = (transaction) => {
       console.log('Received transaction:', transaction);
       
+      // Format and analyze transaction
+      const formattedTransaction = formatTransaction(transaction);
+      const startTime = Date.now();
+      
+      // Store transaction
+      setProcessedTransactions(prev => [...prev, formattedTransaction].slice(-100)); // Keep last 100
+      
+      // Update stats
       setLiveStats(prev => {
         const newProcessed = prev.processed + 1;
-        const newFraudDetected = transaction.is_fraud || transaction.flag_value === 1 
+        const newFraudDetected = formattedTransaction.isFraud 
           ? prev.fraudDetected + 1 
           : prev.fraudDetected;
+        
+        const endTime = Date.now();
+        const responseTime = (endTime - startTime) / 1000;
         
         return {
           ...prev,
           processed: newProcessed,
           fraudDetected: newFraudDetected,
           reported: newFraudDetected, // In hackathon, we report all detected fraud
-          detectionRate: newProcessed > 0 ? ((newFraudDetected / newProcessed) * 100).toFixed(1) : '0'
+          detectionRate: newProcessed > 0 ? ((newFraudDetected / newProcessed) * 100).toFixed(1) : '0',
+          avgResponseTime: ((prev.avgResponseTime * (newProcessed - 1) + responseTime) / newProcessed).toFixed(2)
         };
       });
 
-      // Auto-flag high-value transactions (example logic)
-      if (connectionType === 'sse' && transaction.amt && parseFloat(transaction.amt) > 150) {
-        console.log(`🚨 High value transaction detected: $${transaction.amt}`);
-        // Optionally auto-flag here
-        // sseService.flagTransaction(flagUrl, apiKey, transaction.trans_num, 1);
+      // Auto-flag if fraud detected
+      if (connectionType === 'sse' && formattedTransaction.isFraud) {
+        console.log(`🚨 Fraud detected: Score ${formattedTransaction.riskScore} - Pattern: ${formattedTransaction.pattern}`);
+        
+        // Show notification (max once per 3 seconds to avoid spam)
+        const now = Date.now();
+        if (now - lastNotificationRef.current > 3000) {
+          toast.showWarning(
+            `Fraud Detected: $${formattedTransaction.amount.toFixed(2)} - ${formattedTransaction.pattern}`,
+            4000
+          );
+          lastNotificationRef.current = now;
+        }
+        
+        // Auto-flag to server
+        if (streamConfig.apiKey && transaction.trans_num) {
+          sseService.flagTransaction(
+            streamConfig.url.replace('/stream', '/api/flag'),
+            streamConfig.apiKey,
+            transaction.trans_num,
+            1 // Flag as fraud
+          ).then(result => {
+            console.log('Flag response:', result);
+            if (result.success) {
+              console.log('✅ Successfully flagged transaction');
+            }
+          });
+        }
       }
     };
 
@@ -82,12 +120,15 @@ const Dashboard = () => {
     if (type === 'sse') {
       console.log('Starting SSE connection to:', url);
       sseService.connect(url, apiKey);
+      toast.showInfo('Connecting to fraud detection stream...', 3000);
     } else {
       console.log('Starting WebSocket connection to:', url);
       websocketService.connect(url);
+      toast.showInfo('Connecting to WebSocket stream...', 3000);
     }
     
     setIsMonitoring(true);
+    setProcessedTransactions([]);
     
     // Reset stats
     setLiveStats({
@@ -107,7 +148,18 @@ const Dashboard = () => {
     }
     setIsMonitoring(false);
     setConnectionStatus('disconnected');
+    toast.showInfo('Monitoring stopped', 2000);
   };
+
+  // Show connection status notifications
+  useEffect(() => {
+    if (connectionStatus === 'connected') {
+      toast.showSuccess('Connected to stream successfully!', 3000);
+    } else if (connectionStatus === 'error') {
+      toast.showError('Failed to connect to stream', 4000);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [connectionStatus]);
 
   // Mock data for charts
   const chartData = [
@@ -168,30 +220,27 @@ const Dashboard = () => {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnalyticsCard
                 title="Total Transactions"
-                value="12,456"
+                value={liveStats.processed || "0"}
                 icon={CreditCard}
                 color="primary"
+                tooltip="Total transactions processed and analyzed in real-time."
               />
               <AnalyticsCard
                 title="Fraud Detected"
-                value="387"
+                value={liveStats.fraudDetected || "0"}
                 icon={AlertTriangle}
                 color="danger"
+                tooltip="Fraudulent transactions flagged by AI/ML system based on risk patterns."
               />
               <AnalyticsCard
                 title="Detection Rate"
-                value="98.5%"
+                value={`${liveStats.detectionRate || "0"}%`}
                 icon={TrendingUp}
                 color="success"
+                tooltip="Percentage of transactions identified as fraud. Target: high accuracy, low false positives."
               />
             </div>
 
-            {/* Business Intelligence - Hackathon Questions */}
-            <FraudPatterns />
-            
-            <AlertsTimeline />
-            
-            <AgeSegmentAnalysis />
 
             {/* Alerts */}
             <div>
@@ -204,7 +253,22 @@ const Dashboard = () => {
             </div>
 
             {/* Transaction List */}
-            <TransactionList />
+            <TransactionList 
+              transactions={processedTransactions.map(t => ({
+                id: t.id,
+                customer: t.customer,
+                merchant: t.merchant,
+                amount: `$${t.amount.toFixed(2)}`,
+                category: t.category,
+                location: t.location,
+                riskScore: t.riskScore,
+                status: t.isFraud ? 'blocked' : 'completed',
+                date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()
+              }))}
+              maxRows={10}
+              showExport={true}
+              showViewMore={true}
+            />
           </div>
         </main>
       </div>

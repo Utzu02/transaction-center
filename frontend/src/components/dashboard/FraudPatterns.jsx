@@ -1,67 +1,119 @@
-import { TrendingUp } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { TrendingUp, Clock } from 'lucide-react';
 import Card from '../common/Card';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
-const FraudPatterns = ({ patterns = [] }) => {
-  // Mock data if empty
-  const defaultPatterns = [
-    { pattern: 'High Amount (>$1000)', count: 45, percentage: 35 },
-    { pattern: 'Multiple Attempts', count: 38, percentage: 29 },
-    { pattern: 'Unusual Location', count: 28, percentage: 22 },
-    { pattern: 'Velocity Check Failed', count: 12, percentage: 9 },
-    { pattern: 'Card Testing', count: 7, percentage: 5 },
-  ];
+const FraudPatterns = ({ transactions = [] }) => {
+  const [patterns, setPatterns] = useState([]);
+  const [timeframe, setTimeframe] = useState(3600); // 1 hour in seconds
 
-  const data = patterns.length > 0 ? patterns : defaultPatterns;
+  useEffect(() => {
+    // Calculate patterns from real transactions
+    const now = Date.now() / 1000; // current time in seconds
+    const cutoffTime = now - timeframe;
+    
+    // Filter transactions from last hour/timeframe
+    const recentTransactions = transactions.filter(t => 
+      t.isFraud && t.timestamp && t.timestamp >= cutoffTime
+    );
+
+    // Count patterns
+    const patternCounts = {};
+    recentTransactions.forEach(t => {
+      const pattern = t.pattern || 'Other';
+      patternCounts[pattern] = (patternCounts[pattern] || 0) + 1;
+    });
+
+    // Convert to array and sort by count
+    const patternArray = Object.entries(patternCounts)
+      .map(([pattern, count]) => ({
+        pattern,
+        count,
+        color: getPatternColor(pattern)
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5); // Top 5
+
+    setPatterns(patternArray);
+  }, [transactions, timeframe]);
+
+  const getPatternColor = (pattern) => {
+    const colors = {
+      'High-Value Transaction': '#ef4444',
+      'Geographical Anomaly': '#f59e0b',
+      'Unusual Time': '#eab308',
+      'Online Purchase Risk': '#3b82f6',
+      'Micro-Transaction Pattern': '#8b5cf6',
+      'Suspicious Behavior': '#ec4899'
+    };
+    return colors[pattern] || '#6b7280';
+  };
+
+  const totalCount = patterns.reduce((sum, p) => sum + p.count, 0);
 
   return (
     <Card>
-      <div className="flex items-center justify-between mb-6">
-        <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-          <TrendingUp className="w-5 h-5" />
-          Top 5 Fraud Patterns (Last Hour)
-        </h3>
-        <span className="text-sm text-gray-500">
-          Updated: {new Date().toLocaleTimeString()}
-        </span>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Top 5 Fraud Patterns</h3>
+          <p className="text-sm text-gray-600">
+            Last {timeframe === 3600 ? '1 hour' : timeframe === 7200 ? '2 hours' : '4 hours'} • {totalCount} fraud cases
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <select
+            value={timeframe}
+            onChange={(e) => setTimeframe(parseInt(e.target.value))}
+            className="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            <option value="3600">Last Hour</option>
+            <option value="7200">Last 2 Hours</option>
+            <option value="14400">Last 4 Hours</option>
+          </select>
+          <TrendingUp className="w-6 h-6 text-primary-600" />
+        </div>
       </div>
 
-      <div className="space-y-4">
-        {data.map((item, index) => (
-          <div key={index} className="flex items-center gap-4">
-            <div className="w-8 h-8 rounded-full bg-danger-100 text-danger-600 flex items-center justify-center font-bold text-sm">
-              {index + 1}
-            </div>
-            <div className="flex-1">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-sm font-semibold text-gray-900">{item.pattern}</span>
-                <span className="text-sm font-bold text-gray-900">{item.count}</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div 
-                  className="bg-danger-500 h-2 rounded-full transition-all duration-500"
-                  style={{ width: `${item.percentage}%` }}
-                ></div>
-              </div>
+      {patterns.length === 0 ? (
+        <div className="text-center py-12 text-gray-500">
+          <Clock className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>No fraud patterns detected yet</p>
+          <p className="text-sm">Data will appear as fraud is detected</p>
+        </div>
+      ) : (
+        <>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={patterns} layout="horizontal">
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis type="number" stroke="#888" />
+              <YAxis dataKey="pattern" type="category" stroke="#888" width={150} />
+              <Tooltip />
+              <Bar dataKey="count" radius={[0, 8, 8, 0]}>
+                {patterns.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+          
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              {patterns.map((pattern, index) => (
+                <div key={index} className="flex items-center gap-2">
+                  <div 
+                    className="w-3 h-3 rounded-full" 
+                    style={{ backgroundColor: pattern.color }}
+                  />
+                  <span className="text-gray-700 text-xs">{pattern.pattern}</span>
+                  <span className="text-gray-500 ml-auto font-semibold">{pattern.count}</span>
+                </div>
+              ))}
             </div>
           </div>
-        ))}
-      </div>
-
-      <div className="mt-6">
-        <ResponsiveContainer width="100%" height={200}>
-          <BarChart data={data}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="pattern" tick={{ fontSize: 10 }} angle={-45} textAnchor="end" height={80} />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="count" fill="#ef4444" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
+        </>
+      )}
     </Card>
   );
 };
 
 export default FraudPatterns;
-
