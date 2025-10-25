@@ -4,7 +4,7 @@ import Card from '../common/Card';
 
 const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip }) => {
   const [showTooltip, setShowTooltip] = useState(false);
-  const [tooltipPosition, setTooltipPosition] = useState({ top: 0, left: 0 });
+  const [tooltipPosition, setTooltipPosition] = useState(null);
   const buttonRef = useRef(null);
 
   const colorClasses = {
@@ -17,10 +17,31 @@ const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip })
   const handleMouseEnter = () => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
-      setTooltipPosition({
-        top: rect.top - 8, // 8px above button
-        left: rect.left + rect.width / 2, // Center horizontally
-      });
+      const viewportWidth = window.innerWidth;
+      const viewportHeight = window.innerHeight;
+      const tooltipWidth = 256; // 16rem = 256px (w-64)
+      const tooltipHeight = 100; // Approximate
+      
+      let top = rect.top + rect.height / 2;
+      let left = rect.right + 12;
+      let position = 'right';
+      
+      // Check if tooltip would go off-screen to the right
+      if (left + tooltipWidth > viewportWidth - 20) {
+        // Position above instead
+        top = rect.top - 8;
+        left = rect.left + rect.width / 2;
+        position = 'top';
+      }
+      
+      // Check if still going off top
+      if (position === 'top' && top - tooltipHeight < 20) {
+        // Position below instead
+        top = rect.bottom + 8;
+        position = 'bottom';
+      }
+      
+      setTooltipPosition({ top, left, position });
       setShowTooltip(true);
     }
   };
@@ -46,20 +67,35 @@ const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip })
                 >
                   <Info className="w-4 h-4" />
                 </button>
-                {showTooltip && tooltipPosition.top > 0 && (
+                {showTooltip && tooltipPosition && (
                   <div 
-                    className="fixed z-[9999] w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-2xl border border-gray-700 pointer-events-none -translate-x-1/2 -translate-y-full transition-opacity duration-150"
+                    className={`fixed z-[9999] w-64 p-3 bg-gray-900 text-white text-xs leading-relaxed rounded-lg shadow-2xl border border-gray-700 pointer-events-none transition-opacity duration-150 ${
+                      tooltipPosition.position === 'right' ? '-translate-y-1/2' :
+                      tooltipPosition.position === 'top' ? '-translate-x-1/2 -translate-y-full' :
+                      '-translate-x-1/2'
+                    }`}
                     style={{
                       top: `${tooltipPosition.top}px`,
                       left: `${tooltipPosition.left}px`,
-                      opacity: tooltipPosition.top > 0 ? 1 : 0,
                     }}
                   >
                     {tooltip}
-                    {/* Arrow */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
-                      <div className="border-8 border-transparent border-t-gray-900"></div>
-                    </div>
+                    {/* Arrow - positioned based on tooltip position */}
+                    {tooltipPosition.position === 'right' && (
+                      <div className="absolute right-full top-1/2 -translate-y-1/2 mr-px">
+                        <div className="border-8 border-transparent border-r-gray-900"></div>
+                      </div>
+                    )}
+                    {tooltipPosition.position === 'top' && (
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                        <div className="border-8 border-transparent border-t-gray-900"></div>
+                      </div>
+                    )}
+                    {tooltipPosition.position === 'bottom' && (
+                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 -mb-px">
+                        <div className="border-8 border-transparent border-b-gray-900"></div>
+                      </div>
+                    )}
                   </div>
                 )}
               </>

@@ -16,7 +16,7 @@ const Sidebar = () => {
   const getActiveItem = () => {
     const path = location.pathname;
     if (path === '/dashboard') return 'dashboard';
-    if (path === '/transactions') return 'transactions';
+    if (path === '/transactions' || path.startsWith('/transaction/')) return 'transactions';
     if (path === '/alerts') return 'alerts';
     if (path === '/analytics') return 'analytics';
     if (path === '/settings') return 'settings';

@@ -1,13 +1,42 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Eye, Download, ChevronRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../common/Card';
 import Badge from '../common/Badge';
 import Button from '../common/Button';
 
-const TransactionList = ({ transactions = [], filter = 'all', showExport = true, showViewMore = true, maxRows = null }) => {
+const TransactionList = ({ 
+  transactions = [], 
+  filter = 'all', 
+  showExport = true, 
+  showViewMore = true, 
+  maxRows = null,
+  totalFilteredCount = null,
+  onTransactionsLoaded = null,
+  onLoadMore = null,
+  hasMore = false,
+  remaining = 0,
+  searchTerm = '',
+  // Advanced filters
+  filterMerchants = [],
+  filterCategories = [],
+  filterLocations = [],
+  filterRiskLevels = [],
+  filterStatuses = [],
+  filterTimeRange = [0, 24],
+  filterAmountRange = [0, 5000]
+}) => {
   const navigate = useNavigate();
   const [selectedTransactions, setSelectedTransactions] = useState(new Set());
+  
+  // Notify parent of all transactions for dynamic filter generation (only once on mount)
+  useEffect(() => {
+    const data = transactions.length > 0 ? transactions : mockTransactions;
+    if (onTransactionsLoaded && data.length > 0) {
+      onTransactionsLoaded(data);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Empty dependency array - run only once on mount
   
   // Mock data based on real CSV structure
   const mockTransactions = [
@@ -94,21 +123,289 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
       category: 'Gas & Transport',
       customer: 'Denise Orozco',
       location: 'Ramer, TN'
+    },
+    {
+      id: 'a1b2c3d4-e5f6-7890-abcd-ef1234567890',
+      merchant: 'Walmart Supercenter',
+      amount: '$145.67',
+      status: 'completed',
+      riskScore: 12,
+      date: '2025-08-26 00:00:10',
+      method: 'Visa ****2345',
+      category: 'Grocery',
+      customer: 'Emily Rodriguez',
+      location: 'Houston, TX'
+    },
+    {
+      id: 'b2c3d4e5-f6a7-8901-bcde-f12345678901',
+      merchant: 'Amazon.com',
+      amount: '$299.99',
+      status: 'completed',
+      riskScore: 25,
+      date: '2025-08-26 00:00:12',
+      method: 'Mastercard ****6789',
+      category: 'Shopping',
+      customer: 'Michael Chen',
+      location: 'Seattle, WA'
+    },
+    {
+      id: 'c3d4e5f6-a7b8-9012-cdef-123456789012',
+      merchant: 'Target Store',
+      amount: '$78.23',
+      status: 'completed',
+      riskScore: 9,
+      date: '2025-08-26 00:00:15',
+      method: 'Amex ****4567',
+      category: 'Shopping',
+      customer: 'Sarah Johnson',
+      location: 'Chicago, IL'
+    },
+    {
+      id: 'd4e5f6a7-b8c9-0123-def1-234567890123',
+      merchant: 'Suspicious Online Store',
+      amount: '$987.50',
+      status: 'blocked',
+      riskScore: 95,
+      date: '2025-08-26 00:00:18',
+      method: 'Visa ****8888',
+      category: 'Shopping',
+      customer: 'John Smith',
+      location: 'Miami, FL'
+    },
+    {
+      id: 'e5f6a7b8-c9d0-1234-ef12-345678901234',
+      merchant: 'Starbucks Coffee',
+      amount: '$5.75',
+      status: 'completed',
+      riskScore: 3,
+      date: '2025-08-26 00:00:20',
+      method: 'Discover ****3456',
+      category: 'Dining',
+      customer: 'Lisa Anderson',
+      location: 'Portland, OR'
+    },
+    {
+      id: 'f6a7b8c9-d0e1-2345-f123-456789012345',
+      merchant: 'Shell Gas Station',
+      amount: '$55.00',
+      status: 'completed',
+      riskScore: 14,
+      date: '2025-08-26 00:00:22',
+      method: 'Visa ****7890',
+      category: 'Gas & Transport',
+      customer: 'David Williams',
+      location: 'Phoenix, AZ'
+    },
+    {
+      id: 'a7b8c9d0-e1f2-3456-1234-567890123456',
+      merchant: 'Best Buy Electronics',
+      amount: '$1,234.99',
+      status: 'blocked',
+      riskScore: 87,
+      date: '2025-08-26 00:00:25',
+      method: 'Mastercard ****9999',
+      category: 'Shopping',
+      customer: 'Robert Garcia',
+      location: 'Las Vegas, NV'
+    },
+    {
+      id: 'b8c9d0e1-f2a3-4567-2345-678901234567',
+      merchant: 'CVS Pharmacy',
+      amount: '$42.15',
+      status: 'completed',
+      riskScore: 11,
+      date: '2025-08-26 00:00:28',
+      method: 'Amex ****1234',
+      category: 'Healthcare',
+      customer: 'Jennifer Martinez',
+      location: 'Boston, MA'
+    },
+    {
+      id: 'c9d0e1f2-a3b4-5678-3456-789012345678',
+      merchant: 'Uber Ride',
+      amount: '$23.50',
+      status: 'completed',
+      riskScore: 16,
+      date: '2025-08-26 00:00:30',
+      method: 'Visa ****5555',
+      category: 'Gas & Transport',
+      customer: 'Thomas Brown',
+      location: 'San Francisco, CA'
+    },
+    {
+      id: 'd0e1f2a3-b4c5-6789-4567-890123456789',
+      merchant: 'Netflix Subscription',
+      amount: '$15.99',
+      status: 'completed',
+      riskScore: 4,
+      date: '2025-08-26 00:00:32',
+      method: 'Mastercard ****6666',
+      category: 'Entertainment',
+      customer: 'Jessica Taylor',
+      location: 'Austin, TX'
+    },
+    {
+      id: 'e1f2a3b4-c5d6-7890-5678-901234567890',
+      merchant: 'Unknown Foreign Merchant',
+      amount: '$2,500.00',
+      status: 'blocked',
+      riskScore: 98,
+      date: '2025-08-26 00:00:35',
+      method: 'Visa ****0000',
+      category: 'Shopping',
+      customer: 'Mark Wilson',
+      location: 'New York, NY'
+    },
+    {
+      id: 'f2a3b4c5-d6e7-8901-6789-012345678901',
+      merchant: 'Whole Foods Market',
+      amount: '$87.40',
+      status: 'completed',
+      riskScore: 13,
+      date: '2025-08-26 00:00:38',
+      method: 'Discover ****7777',
+      category: 'Grocery',
+      customer: 'Amanda Davis',
+      location: 'Denver, CO'
+    },
+    {
+      id: 'a3b4c5d6-e7f8-9012-7890-123456789012',
+      merchant: 'AMC Theaters',
+      amount: '$34.50',
+      status: 'completed',
+      riskScore: 7,
+      date: '2025-08-26 00:00:40',
+      method: 'Amex ****2222',
+      category: 'Entertainment',
+      customer: 'Christopher Lee',
+      location: 'Dallas, TX'
     }
   ];
 
-  // Use provided transactions or mock data
-  let data = transactions.length > 0 ? transactions : mockTransactions;
-  
-  // Apply main filter (from props)
-  if (filter === 'accepted') {
-    data = data.filter(t => t.status === 'completed');
-  } else if (filter === 'blocked') {
-    data = data.filter(t => t.status === 'blocked');
-  }
+  // Use provided transactions or mock data - memoize to prevent recalculation
+  const baseData = useMemo(() => {
+    return transactions.length > 0 ? transactions : mockTransactions;
+  }, [transactions]);
+
+  // Apply all filters using useMemo
+  const filteredData = useMemo(() => {
+    let data = [...baseData];
+    
+    // Apply search filter first
+    if (searchTerm && searchTerm.trim() !== '') {
+      const search = searchTerm.toLowerCase();
+      data = data.filter(t => {
+        return (
+          t.id.toLowerCase().includes(search) ||
+          t.merchant.toLowerCase().includes(search) ||
+          t.customer.toLowerCase().includes(search) ||
+          t.amount.toLowerCase().includes(search) ||
+          t.location.toLowerCase().includes(search) ||
+          t.category.toLowerCase().includes(search)
+        );
+      });
+    }
+    
+    // Apply main filter (from props)
+    if (filter === 'accepted') {
+      data = data.filter(t => t.status === 'completed');
+    } else if (filter === 'blocked') {
+      data = data.filter(t => t.status === 'blocked');
+    }
+
+    // Apply advanced filters
+    if (filterMerchants.length > 0) {
+      data = data.filter(t => {
+        const merchantName = t.merchant;
+        // Compare with the actual merchant name, filterMerchants contains sanitized values
+        return filterMerchants.some(m => {
+          const sanitized = merchantName.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return sanitized === m || merchantName === m;
+        });
+      });
+    }
+
+    if (filterCategories.length > 0) {
+      data = data.filter(t => {
+        const category = t.category;
+        // Compare with the actual category name, filterCategories contains sanitized values
+        return filterCategories.some(c => {
+          const sanitized = category.toLowerCase().replace(/[^a-z0-9]/g, '');
+          return sanitized === c || category === c;
+        });
+      });
+    }
+
+    if (filterLocations.length > 0) {
+      data = data.filter(t => {
+        const location = t.location;
+        return filterLocations.some(loc => location.includes(loc));
+      });
+    }
+
+    if (filterRiskLevels.length > 0) {
+      data = data.filter(t => {
+        const risk = t.riskScore;
+        return filterRiskLevels.some(level => {
+          if (level === 'low') return risk >= 0 && risk <= 30;
+          if (level === 'medium') return risk > 30 && risk <= 70;
+          if (level === 'high') return risk > 70 && risk <= 100;
+          return false;
+        });
+      });
+    }
+
+    if (filterStatuses.length > 0) {
+      data = data.filter(t => {
+        return filterStatuses.some(status => {
+          if (status === 'accepted') return t.status === 'completed';
+          if (status === 'blocked') return t.status === 'blocked';
+          return false;
+        });
+      });
+    }
+
+    // Time range filter (hours ago)
+    if (filterTimeRange[0] !== 0 || filterTimeRange[1] !== 24) {
+      data = data.filter(t => {
+        const now = new Date();
+        const txDate = new Date(t.date);
+        const hoursAgo = (now - txDate) / (1000 * 60 * 60);
+        return hoursAgo >= filterTimeRange[0] && hoursAgo <= filterTimeRange[1];
+      });
+    }
+
+    // Amount range filter
+    if (filterAmountRange[0] !== 0 || filterAmountRange[1] !== 5000) {
+      data = data.filter(t => {
+        const amount = parseFloat(t.amount.replace('$', '').replace(',', ''));
+        return amount >= filterAmountRange[0] && amount <= filterAmountRange[1];
+      });
+    }
+
+    return data;
+  }, [
+    baseData,
+    searchTerm,
+    filter,
+    filterMerchants,
+    filterCategories,
+    filterLocations,
+    filterRiskLevels,
+    filterStatuses,
+    filterTimeRange,
+    filterAmountRange
+  ]);
+
+  // Notify parent of total filtered count
+  useEffect(() => {
+    if (totalFilteredCount) {
+      totalFilteredCount(filteredData.length);
+    }
+  }, [filteredData.length, totalFilteredCount]);
 
   // Limit rows for display
-  const displayData = maxRows ? data.slice(0, maxRows) : data;
+  const displayData = maxRows ? filteredData.slice(0, maxRows) : filteredData;
 
   // Check if all displayed transactions are selected
   const allSelected = displayData.length > 0 && displayData.every(t => selectedTransactions.has(t.id));
@@ -191,7 +488,7 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
 
   const handleExportCSV = () => {
     // Use only selected transactions
-    const exportData = data.filter(t => selectedTransactions.has(t.id));
+    const exportData = filteredData.filter(t => selectedTransactions.has(t.id));
 
     if (exportData.length === 0) {
       alert('Please select at least one transaction to export');
@@ -354,17 +651,35 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
         </table>
       </div>
 
-      {showViewMore && maxRows && data.length > maxRows && (
-        <div className="mt-4 pt-4 border-t border-gray-200 text-center">
-          <Button 
-            variant="outline" 
-            onClick={() => navigate('/transactions')}
-            className="w-full"
-          >
-            View All Transactions ({data.length})
-            <ChevronRight className="w-4 h-4 ml-2" />
-          </Button>
-        </div>
+      {/* Load More or View All button */}
+      {showViewMore && (
+        <>
+          {onLoadMore && hasMore ? (
+            // Load More button for Transactions page
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={onLoadMore}
+                className="group flex items-center gap-2 px-8 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/50 transition-all transform hover:scale-105 font-medium"
+              >
+                <span>Load More Transactions ({remaining} remaining)</span>
+                <svg className="w-5 h-5 transition-transform group-hover:translate-y-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          ) : maxRows && filteredData.length > maxRows ? (
+            // View All button for Dashboard
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => navigate('/transactions')}
+                className="group flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/50 transition-all transform hover:scale-105 font-medium"
+              >
+                <span>View All {filteredData.length} Transactions</span>
+                <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
     </Card>
   );

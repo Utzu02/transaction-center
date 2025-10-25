@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { CreditCard, AlertTriangle, TrendingUp, Settings, Upload } from 'lucide-react';
+import { CreditCard, AlertTriangle, TrendingUp, Upload, Play, Square } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '../components/common/ToastContainer';
 import Sidebar from '../components/dashboard/Sidebar';
@@ -9,11 +9,9 @@ import TransactionList from '../components/dashboard/TransactionList';
 import FraudAlert from '../components/dashboard/FraudAlert';
 import LiveMonitor from '../components/dashboard/LiveMonitor';
 import Button from '../components/common/Button';
-import Card from '../components/common/Card';
 import websocketService from '../services/websocket';
 import sseService from '../services/sse';
 import { formatTransaction } from '../utils/fraudDetection';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -22,8 +20,12 @@ const Dashboard = () => {
   
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isMonitoring, setIsMonitoring] = useState(false);
-  const [connectionType, setConnectionType] = useState('websocket');
-  const [streamConfig, setStreamConfig] = useState({ url: '', apiKey: '' });
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionType, setConnectionType] = useState('sse');
+  const [streamConfig, setStreamConfig] = useState({ 
+    url: import.meta.env.VITE_STREAM_URL || 'https://95.217.75.14:8443/stream', 
+    apiKey: import.meta.env.VITE_API_KEY || '' 
+  });
   const [liveStats, setLiveStats] = useState({
     processed: 0,
     fraudDetected: 0,
@@ -33,10 +35,91 @@ const Dashboard = () => {
   });
   const [processedTransactions, setProcessedTransactions] = useState([]);
 
+  // Handle start monitoring
+  const handleStartMonitoring = () => {
+    const url = streamConfig.url.trim();
+    const key = streamConfig.apiKey.trim();
+    
+    if (!url) {
+      toast.showError('Please configure the stream URL in Settings first', 3000);
+      navigate('/settings');
+      return;
+    }
+
+    if (connectionType === 'sse' && !key) {
+      toast.showError('⚠️ API Key is required for SSE connection. Please add it in Settings.', 4000);
+      navigate('/settings');
+      return;
+    }
+
+    // Auto-prepend protocol if not present
+    let finalUrl = url;
+    if (connectionType === 'websocket') {
+      if (!finalUrl.startsWith('ws://') && !finalUrl.startsWith('wss://')) {
+        finalUrl = 'ws://' + finalUrl;
+      }
+    } else {
+      if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) {
+        finalUrl = 'https://' + finalUrl;
+      }
+    }
+
+    // Show connecting toast immediately
+    toast.showInfo('🔄 Connecting to fraud detection stream...', 3000);
+    setIsConnecting(true);
+    
+    try {
+      console.log('🚀 Starting connection:', { type: connectionType, url: finalUrl, hasKey: !!key });
+      
+      if (connectionType === 'sse') {
+        sseService.connect(finalUrl, key);
+      } else {
+        websocketService.connect(finalUrl);
+      }
+    } catch (error) {
+      console.error('❌ Connection error:', error);
+      toast.showError(`Failed to start monitoring: ${error.message}`, 4000);
+      setIsConnecting(false);
+    }
+  };
+
+  // Handle stop monitoring
+  const handleStopMonitoring = () => {
+    websocketService.disconnect();
+    sseService.disconnect();
+    setIsMonitoring(false);
+    setConnectionStatus('disconnected');
+    toast.showInfo('Monitoring stopped', 2000);
+  };
+
+  // Load configuration from localStorage on mount
+  useEffect(() => {
+    const savedConfig = localStorage.getItem('monitorConfig');
+    if (savedConfig) {
+      try {
+        const config = JSON.parse(savedConfig);
+        setStreamConfig(config.streamConfig || streamConfig);
+        setConnectionType(config.connectionType || connectionType);
+      } catch (e) {
+        console.error('Failed to load saved config:', e);
+      }
+    }
+  }, []);
+
   useEffect(() => {
     // Subscribe to connection events for both services
     const handleConnection = (data) => {
       setConnectionStatus(data.status);
+      
+      // Handle connection success or failure
+      if (data.status === 'connected') {
+        setIsConnecting(false);
+        setIsMonitoring(true);
+      } else if (data.status === 'error') {
+        setIsConnecting(false);
+        setIsMonitoring(false);
+        toast.showError(`❌ Connection failed: ${data.error || 'Unknown error'}`, 4000);
+      }
     };
 
     // Subscribe to transaction events for both services
@@ -113,45 +196,6 @@ const Dashboard = () => {
     };
   }, [connectionType]);
 
-  const handleStartMonitoring = (config) => {
-    const { url, apiKey, type } = config;
-    
-    setConnectionType(type);
-    setStreamConfig({ url, apiKey });
-    
-    if (type === 'sse') {
-      console.log('Starting SSE connection to:', url);
-      sseService.connect(url, apiKey);
-      toast.showInfo('Connecting to fraud detection stream...', 3000);
-    } else {
-      console.log('Starting WebSocket connection to:', url);
-      websocketService.connect(url);
-      toast.showInfo('Connecting to WebSocket stream...', 3000);
-    }
-    
-    setIsMonitoring(true);
-    setProcessedTransactions([]);
-    
-    // Reset stats
-    setLiveStats({
-      processed: 0,
-      fraudDetected: 0,
-      reported: 0,
-      avgResponseTime: 0,
-      detectionRate: 0
-    });
-  };
-
-  const handleStopMonitoring = () => {
-    if (connectionType === 'sse') {
-      sseService.disconnect();
-    } else {
-      websocketService.disconnect();
-    }
-    setIsMonitoring(false);
-    setConnectionStatus('disconnected');
-    toast.showInfo('Monitoring stopped', 2000);
-  };
 
   const handleImportCSV = (event) => {
     const file = event.target.files[0];
@@ -260,17 +304,6 @@ const Dashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionStatus]);
 
-  // Mock data for charts
-  const chartData = [
-    { name: 'Mon', transactions: 4000, fraud: 240 },
-    { name: 'Tue', transactions: 3000, fraud: 139 },
-    { name: 'Wed', transactions: 2000, fraud: 98 },
-    { name: 'Thu', transactions: 2780, fraud: 390 },
-    { name: 'Fri', transactions: 1890, fraud: 480 },
-    { name: 'Sat', transactions: 2390, fraud: 380 },
-    { name: 'Sun', transactions: 3490, fraud: 430 },
-  ];
-
   const mockAlerts = [
     {
       title: 'Suspicious Transaction Detected',
@@ -325,15 +358,33 @@ const Dashboard = () => {
                   </Button>
                 </label>
                 
-                {/* Configure Monitor Button */}
-                {!isMonitoring && (
+                {/* Start/Stop Monitoring Buttons */}
+                {isConnecting ? (
                   <Button
-                    variant="outline"
-                    onClick={() => navigate('/settings')}
+                    variant="success"
+                    disabled
                     className="flex items-center gap-2"
                   >
-                    <Settings className="w-4 h-4" />
-                    Configure Monitor
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    Monitoring...
+                  </Button>
+                ) : isMonitoring ? (
+                  <Button
+                    variant="danger"
+                    onClick={handleStopMonitoring}
+                    className="flex items-center gap-2"
+                  >
+                    <Square className="w-4 h-4" />
+                    Stop Monitoring
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    onClick={handleStartMonitoring}
+                    className="flex items-center gap-2"
+                  >
+                    <Play className="w-4 h-4" />
+                    Start Monitoring
                   </Button>
                 )}
               </div>
@@ -391,7 +442,7 @@ const Dashboard = () => {
                 status: t.isFraud ? 'blocked' : 'completed',
                 date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()
               }))}
-              maxRows={10}
+              maxRows={5}
               showExport={true}
               showViewMore={true}
             />
