@@ -63,7 +63,7 @@ const Alerts = () => {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-red-50 to-gray-50">
       <Sidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -73,7 +73,7 @@ const Alerts = () => {
           <div className="p-6 space-y-6">
             {/* Page Header */}
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Fraud Alerts</h1>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-red-600 via-orange-600 to-red-600 bg-clip-text text-transparent">Fraud Alerts</h1>
               <p className="text-gray-600">Monitor and respond to suspicious activities</p>
             </div>
 

@@ -63,21 +63,21 @@ const NotificationDropdown = () => {
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+        className="relative p-2 text-gray-600 hover:bg-white/50 backdrop-blur-sm rounded-xl transition-all transform hover:scale-105"
       >
         <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
         )}
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="absolute -top-1 -right-1 bg-gradient-to-r from-red-500 to-rose-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center shadow-lg">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-12 w-96 bg-white rounded-lg shadow-xl border border-gray-200 z-[9999] animate-fade-in">
+        <div className="absolute right-0 top-12 w-96 bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-gray-200 z-[9999] animate-fade-in">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
             <div>

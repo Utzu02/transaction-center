@@ -90,7 +90,7 @@ const LiveMonitorControl = ({ onStart, onStop, isRunning }) => {
       </div>
 
       {showConfig && (
-        <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200 space-y-4">
+        <div className="mt-4 p-4 bg-gradient-to-br from-gray-50 to-blue-50 rounded-xl border border-gray-200 space-y-4">
           {/* Connection Type */}
           <div>
             <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -99,9 +99,9 @@ const LiveMonitorControl = ({ onStart, onStop, isRunning }) => {
             <div className="flex gap-2">
               <button
                 onClick={() => setConnectionType('sse')}
-                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                className={`flex-1 px-4 py-2 rounded-xl border-2 transition-all transform hover:scale-105 ${
                   connectionType === 'sse'
-                    ? 'border-primary-500 bg-primary-50 text-primary-700 font-semibold'
+                    ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 font-semibold shadow-md'
                     : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
                 }`}
               >
@@ -109,9 +109,9 @@ const LiveMonitorControl = ({ onStart, onStop, isRunning }) => {
               </button>
               <button
                 onClick={() => setConnectionType('websocket')}
-                className={`flex-1 px-4 py-2 rounded-lg border-2 transition-all ${
+                className={`flex-1 px-4 py-2 rounded-xl border-2 transition-all transform hover:scale-105 ${
                   connectionType === 'websocket'
-                    ? 'border-primary-500 bg-primary-50 text-primary-700 font-semibold'
+                    ? 'border-blue-500 bg-gradient-to-r from-blue-50 to-cyan-50 text-blue-700 font-semibold shadow-md'
                     : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
                 }`}
               >
@@ -130,7 +130,7 @@ const LiveMonitorControl = ({ onStart, onStop, isRunning }) => {
               value={streamUrl}
               onChange={(e) => setStreamUrl(e.target.value)}
               placeholder={connectionType === 'sse' ? 'https://95.217.75.14:8443/stream' : 'localhost:8080/stream'}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/80"
             />
             <p className="mt-1 text-xs text-gray-500">
               {connectionType === 'sse' 
@@ -150,7 +150,7 @@ const LiveMonitorControl = ({ onStart, onStop, isRunning }) => {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="Enter your API key (X-API-Key header)"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 font-mono text-sm"
+                className="w-full px-4 py-2.5 bg-white/50 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all hover:bg-white/80 font-mono text-sm"
               />
               <p className="mt-1 text-xs text-gray-500">
                 Required for authenticating with the hackathon stream
@@ -159,7 +159,7 @@ const LiveMonitorControl = ({ onStart, onStop, isRunning }) => {
           )}
 
           {/* Help Text */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="bg-gradient-to-r from-blue-50 to-cyan-50 border border-blue-200 rounded-xl p-3">
             <p className="text-xs text-blue-800">
               <strong>💡 Hackathon Setup:</strong><br/>
               • Use SSE connection type<br/>
@@ -171,7 +171,7 @@ const LiveMonitorControl = ({ onStart, onStop, isRunning }) => {
           
           {/* Environment Status */}
           {import.meta.env.VITE_API_KEY && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-xl p-3">
               <p className="text-xs text-green-800">
                 ✅ <strong>API Key loaded from .env file</strong>
               </p>

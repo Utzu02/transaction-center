@@ -8,10 +8,10 @@ const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip })
   const buttonRef = useRef(null);
 
   const colorClasses = {
-    primary: 'bg-primary-50 text-primary-600',
-    success: 'bg-success-50 text-success-600',
-    danger: 'bg-danger-50 text-danger-600',
-    warning: 'bg-yellow-50 text-yellow-600',
+    primary: 'bg-gradient-to-br from-blue-100 to-cyan-100 text-blue-600',
+    success: 'bg-gradient-to-br from-green-100 to-emerald-100 text-green-600',
+    danger: 'bg-gradient-to-br from-red-100 to-rose-100 text-red-600',
+    warning: 'bg-gradient-to-br from-yellow-100 to-orange-100 text-yellow-600',
   };
 
   const handleMouseEnter = () => {

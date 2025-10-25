@@ -58,14 +58,6 @@ const Settings = () => {
         <Header />
         
         <main className="flex-1 overflow-y-auto p-6">
-          {/* Back button */}
-          <button
-            onClick={() => navigate('/dashboard')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 transition-colors"
-          >
-            <ArrowLeft className="w-5 h-5" />
-            <span className="font-medium">Back to Dashboard</span>
-          </button>
 
           <div className="max-w-6xl mx-auto">
             <div className="mb-8">

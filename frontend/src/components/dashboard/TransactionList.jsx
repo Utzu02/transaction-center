@@ -7,7 +7,6 @@ import Button from '../common/Button';
 
 const TransactionList = ({ transactions = [], filter = 'all', showExport = true, showViewMore = true, maxRows = null }) => {
   const navigate = useNavigate();
-  const [exportFilter, setExportFilter] = useState('all');
   const [selectedTransactions, setSelectedTransactions] = useState(new Set());
   
   // Mock data based on real CSV structure
@@ -108,16 +107,8 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
     data = data.filter(t => t.status === 'blocked');
   }
 
-  // Apply export filter for preview
-  let filteredData = data;
-  if (exportFilter === 'accepted') {
-    filteredData = data.filter(t => t.status === 'completed');
-  } else if (exportFilter === 'blocked') {
-    filteredData = data.filter(t => t.status === 'blocked');
-  }
-
   // Limit rows for display
-  const displayData = maxRows ? filteredData.slice(0, maxRows) : filteredData;
+  const displayData = maxRows ? data.slice(0, maxRows) : data;
 
   // Check if all displayed transactions are selected
   const allSelected = displayData.length > 0 && displayData.every(t => selectedTransactions.has(t.id));
@@ -185,13 +176,13 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
   };
 
   const toggleAllTransactions = () => {
-    if (allSelected) {
-      // Deselect all
+    if (allSelected || someSelected) {
+      // Deselect all (both when all selected or some selected for intuitive behavior)
       const newSelected = new Set(selectedTransactions);
       displayData.forEach(t => newSelected.delete(t.id));
       setSelectedTransactions(newSelected);
     } else {
-      // Select all displayed
+      // Select all displayed (only when none are selected)
       const newSelected = new Set(selectedTransactions);
       displayData.forEach(t => newSelected.add(t.id));
       setSelectedTransactions(newSelected);
@@ -200,7 +191,7 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
 
   const handleExportCSV = () => {
     // Use only selected transactions
-    const exportData = filteredData.filter(t => selectedTransactions.has(t.id));
+    const exportData = data.filter(t => selectedTransactions.has(t.id));
 
     if (exportData.length === 0) {
       alert('Please select at least one transaction to export');
@@ -233,7 +224,7 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
     link.setAttribute('href', url);
-    link.setAttribute('download', `transactions_${exportFilter}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute('download', `transactions_${filter}_${new Date().toISOString().split('T')[0]}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -245,36 +236,31 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Recent Transactions</h2>
-          {selectedTransactions.size > 0 && (
-            <p className="text-sm text-gray-600 mt-1">
-              {selectedTransactions.size} transaction{selectedTransactions.size !== 1 ? 's' : ''} selected
-            </p>
-          )}
+          <p className="text-sm text-gray-600 mt-1">
+            {selectedTransactions.size > 0 ? (
+              <>
+                {selectedTransactions.size} transaction{selectedTransactions.size !== 1 ? 's' : ''} selected
+                {someSelected && (
+                  <span className="ml-2 text-xs text-blue-600 font-semibold">
+                    • Click checkbox to deselect
+                  </span>
+                )}
+              </>
+            ) : (
+              <>No transactions selected</>
+            )}
+          </p>
         </div>
         {showExport && (
-          <div className="flex items-center gap-2">
-            <select
-              value={exportFilter}
-              onChange={(e) => {
-                setExportFilter(e.target.value);
-                setSelectedTransactions(new Set()); // Clear selection when changing filter
-              }}
-              className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="all">All Transactions</option>
-              <option value="accepted">Accepted Only</option>
-              <option value="blocked">Blocked Only</option>
-            </select>
-            <Button 
-              variant="secondary" 
-              size="sm" 
-              onClick={handleExportCSV}
-              disabled={selectedTransactions.size === 0}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV ({selectedTransactions.size})
-            </Button>
-          </div>
+          <Button 
+            variant="secondary" 
+            size="sm" 
+            onClick={handleExportCSV}
+            disabled={selectedTransactions.size === 0}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Export CSV ({selectedTransactions.size})
+          </Button>
         )}
       </div>
 
@@ -284,26 +270,34 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
             <tr className="border-b border-gray-200">
               {showExport && (
                 <th className="w-12 py-3 px-4">
-                  <input
-                    type="checkbox"
-                    checked={allSelected}
-                    ref={input => {
-                      if (input) input.indeterminate = someSelected;
-                    }}
-                    onChange={toggleAllTransactions}
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
-                  />
+                  <div className="relative group">
+                    <input
+                      type="checkbox"
+                      checked={allSelected}
+                      ref={input => {
+                        if (input) input.indeterminate = someSelected;
+                      }}
+                      onChange={toggleAllTransactions}
+                      className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                      title={allSelected ? "Click to deselect all" : someSelected ? "Click to deselect all" : "Click to select all"}
+                    />
+                    <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
+                      <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg">
+                        {allSelected ? "Deselect all" : someSelected ? `Deselect all (${selectedTransactions.size} selected)` : `Select all (${displayData.length})`}
+                      </div>
+                    </div>
+                  </div>
                 </th>
               )}
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Date/Time</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Customer</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Merchant</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Amount</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Category</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Location</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Risk</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Status</th>
-              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Actions</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Date/Time</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Customer</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Merchant</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Amount</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Category</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Location</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Risk</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Status</th>
+              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600 whitespace-nowrap">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -321,22 +315,22 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
                       />
                     </td>
                   )}
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap">
                     <span className="text-xs text-gray-500">{formatDateTime(transaction.date)}</span>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap overflow-hidden text-ellipsis">
                     <span className="text-sm font-semibold text-gray-900">{transaction.customer}</span>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap overflow-hidden text-ellipsis">
                     <span className="text-sm text-gray-900">{transaction.merchant}</span>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap">
                     <span className="text-sm font-semibold text-gray-900">{transaction.amount}</span>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap">
                     <span className="text-sm text-gray-600">{transaction.category}</span>
                   </td>
-                  <td className="py-4 px-4">
+                  <td className="py-4 px-4 whitespace-nowrap overflow-hidden text-ellipsis">
                     <span className="text-sm text-gray-600">{transaction.location}</span>
                   </td>
                   <td className="py-4 px-4">
@@ -365,14 +359,14 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
         </table>
       </div>
 
-      {showViewMore && maxRows && filteredData.length > maxRows && (
+      {showViewMore && maxRows && data.length > maxRows && (
         <div className="mt-4 pt-4 border-t border-gray-200 text-center">
           <Button 
             variant="outline" 
             onClick={() => navigate('/transactions')}
             className="w-full"
           >
-            View All Transactions ({filteredData.length})
+            View All Transactions ({data.length})
             <ChevronRight className="w-4 h-4 ml-2" />
           </Button>
         </div>

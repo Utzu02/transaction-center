@@ -1,63 +1,78 @@
-import { Shield, ArrowRight } from 'lucide-react';
-import Button from '../common/Button';
+import { Shield, Rocket, Lock, Eye, Zap } from "lucide-react";
+import Button from "../common/Button";
 
 const Hero = ({ onGetStarted }) => {
   return (
-    <div className="relative bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 text-white">
-      <div className="container-custom py-24 md:py-32">
-        <div className="max-w-4xl mx-auto text-center animate-fade-in">
-          <div className="inline-flex items-center justify-center p-3 bg-white/10 rounded-full mb-6 backdrop-blur-sm">
-            <Shield className="w-12 h-12" />
+    <div className="relative min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 text-white overflow-hidden">
+      {/* Animated background grid */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#1e3a8a15_1px,transparent_1px),linear-gradient(to_bottom,#1e3a8a15_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_80%_50%_at_50%_0%,#000_70%,transparent_110%)]"></div>
+      
+      {/* Floating orbs */}
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl animate-pulse"></div>
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      
+      {/* Content */}
+      <div className="relative z-10 container mx-auto px-6 py-20 md:py-32">
+        <div className="max-w-5xl mx-auto">
+          {/* Icon with glow effect */}
+          <div className="flex justify-center mb-8">
+            <div className="relative">
+              <div className="absolute inset-0 bg-blue-500 blur-xl opacity-50 animate-pulse"></div>
+              <div className="relative inline-flex items-center justify-center p-4 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl backdrop-blur-sm border border-blue-400/30">
+                <Shield className="w-16 h-16 text-blue-400" />
+              </div>
+            </div>
           </div>
-          
-          <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 leading-tight">
-            Detect Fraudulent Transactions in
-            <span className="text-primary-200"> Real Time</span>
+
+          {/* Main heading */}
+          <h1 className="text-center text-5xl md:text-6xl lg:text-7xl font-display font-bold mb-6 leading-tight">
+            <span className="bg-gradient-to-r from-white via-blue-100 to-white bg-clip-text text-transparent">
+              Real-Time Fraud Detection
+            </span>
+            <br />
+            <span className="bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-400 bg-clip-text text-transparent">
+              AI-Powered Security
+            </span>
           </h1>
-          
-          <p className="text-xl md:text-2xl text-primary-100 mb-10 max-w-3xl mx-auto">
-            Protect your business with advanced fraud detection technology. 
-            Automated analysis, instant alerts, and detailed reports.
+
+          {/* Subtitle */}
+          <p className="text-center text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto font-medium">
+            SIEM for POS Fraud Detection
           </p>
-          
-          <div className="flex justify-center">
-            <Button 
-              variant="primary" 
-              size="lg"
+
+          {/* CTA Button */}
+          <div className="flex justify-center mb-20">
+            <button
               onClick={onGetStarted}
-              className="bg-gradient-to-r from-yellow-400 to-orange-500 text-white hover:from-yellow-500 hover:to-orange-600 font-bold text-lg px-10 py-4 shadow-2xl hover:shadow-xl transition-all transform hover:scale-105 border-2 border-yellow-300"
+              className="group relative inline-flex items-center gap-3 px-6 py-5 text-xl font-display font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 rounded-xl hover:from-blue-500 hover:to-cyan-500 transition-all duration-300 transform hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/50"
             >
-              Get Started
-              <ArrowRight className="w-6 h-6" />
-            </Button>
+              <span>Launch Dashboard</span>
+              <Rocket className="w-6 h-6 group-hover:-translate-y-1 group-hover:rotate-12 transition-all duration-300" />
+            </button>
           </div>
-          
-          <div className="mt-16 grid grid-cols-3 gap-8 max-w-2xl mx-auto">
-            <div className="text-center">
-              <div className="text-4xl font-bold mb-2">99.9%</div>
-              <div className="text-primary-200 text-sm">Accuracy</div>
+
+          {/* Feature pills */}
+          <div className="flex flex-wrap justify-center gap-4 md:gap-6">
+            <div className="flex items-center gap-2 px-5 py-3 bg-white/5 backdrop-blur-md rounded-full border border-white/10 hover:border-blue-400/50 transition-all duration-300 hover:scale-105">
+              <Zap className="w-5 h-5 text-yellow-400" />
+              <span className="text-sm md:text-base font-semibold font-display">Real-Time Detection</span>
             </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold mb-2">&lt;100ms</div>
-              <div className="text-primary-200 text-sm">Response Time</div>
+            <div className="flex items-center gap-2 px-5 py-3 bg-white/5 backdrop-blur-md rounded-full border border-white/10 hover:border-blue-400/50 transition-all duration-300 hover:scale-105">
+              <Eye className="w-5 h-5 text-cyan-400" />
+              <span className="text-sm md:text-base font-semibold font-display">Live Monitoring</span>
             </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold mb-2">24/7</div>
-              <div className="text-primary-200 text-sm">Monitoring</div>
+            <div className="flex items-center gap-2 px-5 py-3 bg-white/5 backdrop-blur-md rounded-full border border-white/10 hover:border-blue-400/50 transition-all duration-300 hover:scale-105">
+              <Lock className="w-5 h-5 text-green-400" />
+              <span className="text-sm md:text-base font-semibold font-display">Secure & Private</span>
             </div>
           </div>
         </div>
       </div>
-      
-      {/* Decorative bottom wave */}
-      <div className="absolute bottom-0 left-0 right-0">
-        <svg viewBox="0 0 1440 120" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M0 120L60 105C120 90 240 60 360 45C480 30 600 30 720 37.5C840 45 960 60 1080 67.5C1200 75 1320 75 1380 75L1440 75V120H1380C1320 120 1200 120 1080 120C960 120 840 120 720 120C600 120 480 120 360 120C240 120 120 120 60 120H0Z" fill="rgb(249, 250, 251)"/>
-        </svg>
-      </div>
+
+      {/* Bottom gradient fade */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-gray-50 to-transparent"></div>
     </div>
   );
 };
 
 export default Hero;
-

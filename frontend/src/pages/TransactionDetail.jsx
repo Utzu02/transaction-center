@@ -88,7 +88,7 @@ const TransactionDetail = () => {
   const riskInfo = getRiskColor(transaction.riskScore);
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-cyan-50 to-gray-50">
       <Sidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -109,7 +109,7 @@ const TransactionDetail = () => {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Transaction Details</h1>
+                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-600 bg-clip-text text-transparent">Transaction Details</h1>
                 <p className="text-gray-600">ID: {transaction.id}</p>
               </div>
               <div className="flex gap-3">

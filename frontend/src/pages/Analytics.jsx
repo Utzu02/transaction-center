@@ -96,7 +96,7 @@ const Analytics = () => {
   ];
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-50">
       <Sidebar />
       
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -106,7 +106,7 @@ const Analytics = () => {
           <div className="p-6 space-y-6">
             {/* Page Header */}
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Analytics & Business Intelligence</h1>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-600 bg-clip-text text-transparent">Analytics & Business Intelligence</h1>
               <p className="text-gray-600">Real-time fraud analysis and comprehensive insights</p>
             </div>
 

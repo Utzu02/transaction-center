@@ -18,18 +18,18 @@ const FraudAlert = ({ alert }) => {
   };
 
   return (
-    <Card className="border-l-4 border-danger-500 relative">
+    <Card className="border-l-4 border-red-500 relative hover:shadow-xl transition-all">
       <button
         onClick={() => setIsVisible(false)}
-        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
       >
         <X className="w-5 h-5" />
       </button>
       
       <div className="flex gap-4">
         <div className="flex-shrink-0">
-          <div className="bg-danger-100 p-3 rounded-lg">
-            <AlertTriangle className="w-6 h-6 text-danger-600" />
+          <div className="bg-gradient-to-br from-red-100 to-rose-100 p-3 rounded-xl shadow-lg">
+            <AlertTriangle className="w-6 h-6 text-red-600" />
           </div>
         </div>
         
@@ -54,7 +54,7 @@ const FraudAlert = ({ alert }) => {
             </span>
           </div>
           
-          <div className="bg-gray-50 rounded-lg p-3 mb-4">
+          <div className="bg-gradient-to-r from-gray-50 to-blue-50 rounded-xl p-3 mb-4 border border-gray-100">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-gray-600">Transaction ID:</span>

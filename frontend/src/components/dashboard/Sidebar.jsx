@@ -34,24 +34,24 @@ const Sidebar = () => {
   ];
 
   return (
-    <aside className="bg-white border-r border-gray-200 w-64 flex flex-col h-screen sticky top-0">
+    <aside className="bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 border-r border-white/10 w-64 flex flex-col h-screen sticky top-0">
       {/* Logo */}
-      <div className="p-6 border-b border-gray-200">
+      <div className="p-6 border-b border-white/10">
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-3 mb-4 w-full hover:opacity-80 transition-opacity"
+          className="flex items-center gap-3 mb-4 w-full hover:opacity-80 transition-opacity group"
         >
-          <div className="bg-primary-600 p-2 rounded-lg">
+          <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2 rounded-xl shadow-lg group-hover:shadow-blue-500/50 transition-shadow">
             <Shield className="w-6 h-6 text-white" />
           </div>
           <div className="text-left">
-            <h1 className="text-xl font-bold text-gray-900">FraudDetect</h1>
-            <p className="text-xs text-gray-500">Transaction Center</p>
+            <h1 className="text-xl font-display font-bold text-white">FraudDetect</h1>
+            <p className="text-xs text-gray-400">SIEM Platform</p>
           </div>
         </button>
         <button
           onClick={() => navigate('/')}
-          className="flex items-center gap-2 text-sm text-gray-600 hover:text-primary-600 transition-colors"
+          className="flex items-center gap-2 text-sm text-gray-400 hover:text-blue-400 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Home
@@ -60,7 +60,7 @@ const Sidebar = () => {
       
       {/* Navigation */}
       <nav className="flex-1 px-3 py-6 overflow-y-auto">
-        <ul className="space-y-1">
+        <ul className="space-y-2">
           {menuItems.map((item) => (
             <li key={item.id}>
               <button
@@ -68,16 +68,16 @@ const Sidebar = () => {
                   setActiveItem(item.id);
                   navigate(`/${item.id === 'dashboard' ? 'dashboard' : item.id}`);
                 }}
-                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                   activeItem === item.id
-                    ? 'bg-primary-50 text-primary-700 font-semibold'
-                    : 'text-gray-700 hover:bg-gray-50'
+                    ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white font-semibold shadow-lg'
+                    : 'text-gray-300 hover:bg-white/5 hover:text-white'
                 }`}
               >
                 <item.icon className="w-5 h-5" />
                 <span className="flex-1 text-left">{item.label}</span>
                 {item.badge && (
-                  <span className="bg-danger-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full">
+                  <span className="bg-red-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-lg">
                     {item.badge}
                   </span>
                 )}
@@ -86,6 +86,13 @@ const Sidebar = () => {
           ))}
         </ul>
       </nav>
+      
+      {/* Bottom gradient */}
+      <div className="p-4 border-t border-white/10">
+        <div className="text-center text-xs text-gray-500">
+          Powered by AI/ML
+        </div>
+      </div>
     </aside>
   );
 };
