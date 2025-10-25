@@ -6,6 +6,7 @@ import Transactions from './pages/Transactions';
 import TransactionDetail from './pages/TransactionDetail';
 import Alerts from './pages/Alerts';
 import Analytics from './pages/Analytics';
+import Settings from './pages/Settings';
 
 function App() {
   return (
@@ -13,11 +14,12 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<Landing />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/transaction/:id" element={<TransactionDetail />} />
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/analytics" element={<Analytics />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/transaction/:id" element={<TransactionDetail />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/analytics" element={<Analytics />} />
+            <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

@@ -42,7 +42,7 @@ const LiveMonitorControl = ({ onStart, onStop, isRunning }) => {
       }
     }
 
-    onStart({ url: finalUrl, apiKey: key, type: connectionType });
+    onStart({ connectionType, streamUrl: finalUrl, apiKey: key });
     setShowConfig(false);
   };
 

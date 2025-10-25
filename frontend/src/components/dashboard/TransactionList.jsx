@@ -8,6 +8,7 @@ import Button from '../common/Button';
 const TransactionList = ({ transactions = [], filter = 'all', showExport = true, showViewMore = true, maxRows = null }) => {
   const navigate = useNavigate();
   const [exportFilter, setExportFilter] = useState('all');
+  const [selectedTransactions, setSelectedTransactions] = useState(new Set());
   
   // Mock data based on real CSV structure
   const mockTransactions = [
@@ -100,16 +101,27 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
   // Use provided transactions or mock data
   let data = transactions.length > 0 ? transactions : mockTransactions;
   
-  // Apply filter
+  // Apply main filter (from props)
   if (filter === 'accepted') {
     data = data.filter(t => t.status === 'completed');
   } else if (filter === 'blocked') {
     data = data.filter(t => t.status === 'blocked');
   }
-  // If filter === 'all', show all data
+
+  // Apply export filter for preview
+  let filteredData = data;
+  if (exportFilter === 'accepted') {
+    filteredData = data.filter(t => t.status === 'completed');
+  } else if (exportFilter === 'blocked') {
+    filteredData = data.filter(t => t.status === 'blocked');
+  }
 
   // Limit rows for display
-  const displayData = maxRows ? data.slice(0, maxRows) : data;
+  const displayData = maxRows ? filteredData.slice(0, maxRows) : filteredData;
+
+  // Check if all displayed transactions are selected
+  const allSelected = displayData.length > 0 && displayData.every(t => selectedTransactions.has(t.id));
+  const someSelected = displayData.some(t => selectedTransactions.has(t.id)) && !allSelected;
 
   const getStatusBadge = (status) => {
     const statusMap = {
@@ -148,21 +160,59 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
     });
   };
 
+  const formatDateForCSV = (dateString) => {
+    if (!dateString) return new Date().toLocaleString('en-US');
+    const date = new Date(dateString);
+    return date.toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  };
+
+  const toggleTransaction = (id) => {
+    const newSelected = new Set(selectedTransactions);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedTransactions(newSelected);
+  };
+
+  const toggleAllTransactions = () => {
+    if (allSelected) {
+      // Deselect all
+      const newSelected = new Set(selectedTransactions);
+      displayData.forEach(t => newSelected.delete(t.id));
+      setSelectedTransactions(newSelected);
+    } else {
+      // Select all displayed
+      const newSelected = new Set(selectedTransactions);
+      displayData.forEach(t => newSelected.add(t.id));
+      setSelectedTransactions(newSelected);
+    }
+  };
+
   const handleExportCSV = () => {
-    // Filter data based on export selection
-    let exportData = data;
-    if (exportFilter === 'accepted') {
-      exportData = data.filter(t => t.status === 'completed');
-    } else if (exportFilter === 'blocked') {
-      exportData = data.filter(t => t.status === 'blocked');
+    // Use only selected transactions
+    const exportData = filteredData.filter(t => selectedTransactions.has(t.id));
+
+    if (exportData.length === 0) {
+      alert('Please select at least one transaction to export');
+      return;
     }
 
     // CSV headers
     const headers = ['Date/Time', 'Customer', 'Merchant', 'Amount', 'Category', 'Location', 'Risk Score', 'Status'];
     
-    // CSV rows
+    // CSV rows with properly formatted dates
     const rows = exportData.map(t => [
-      t.date || new Date().toISOString(),
+      formatDateForCSV(t.date),
       t.customer,
       t.merchant,
       t.amount,
@@ -193,21 +243,36 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
   return (
     <Card>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <h2 className="text-xl font-bold text-gray-900">Recent Transactions</h2>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">Recent Transactions</h2>
+          {selectedTransactions.size > 0 && (
+            <p className="text-sm text-gray-600 mt-1">
+              {selectedTransactions.size} transaction{selectedTransactions.size !== 1 ? 's' : ''} selected
+            </p>
+          )}
+        </div>
         {showExport && (
           <div className="flex items-center gap-2">
             <select
               value={exportFilter}
-              onChange={(e) => setExportFilter(e.target.value)}
+              onChange={(e) => {
+                setExportFilter(e.target.value);
+                setSelectedTransactions(new Set()); // Clear selection when changing filter
+              }}
               className="text-sm border border-gray-300 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
-              <option value="all">Export All</option>
-              <option value="accepted">Export Accepted</option>
-              <option value="blocked">Export Blocked</option>
+              <option value="all">All Transactions</option>
+              <option value="accepted">Accepted Only</option>
+              <option value="blocked">Blocked Only</option>
             </select>
-            <Button variant="secondary" size="sm" onClick={handleExportCSV}>
+            <Button 
+              variant="secondary" 
+              size="sm" 
+              onClick={handleExportCSV}
+              disabled={selectedTransactions.size === 0}
+            >
               <Download className="w-4 h-4 mr-2" />
-              Export CSV
+              Export CSV ({selectedTransactions.size})
             </Button>
           </div>
         )}
@@ -217,6 +282,19 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200">
+              {showExport && (
+                <th className="w-12 py-3 px-4">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    ref={input => {
+                      if (input) input.indeterminate = someSelected;
+                    }}
+                    onChange={toggleAllTransactions}
+                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                  />
+                </th>
+              )}
               <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Date/Time</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Customer</th>
               <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Merchant</th>
@@ -233,6 +311,16 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
               const statusInfo = getStatusBadge(transaction.status);
               return (
                 <tr key={transaction.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  {showExport && (
+                    <td className="py-4 px-4">
+                      <input
+                        type="checkbox"
+                        checked={selectedTransactions.has(transaction.id)}
+                        onChange={() => toggleTransaction(transaction.id)}
+                        className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500 cursor-pointer"
+                      />
+                    </td>
+                  )}
                   <td className="py-4 px-4">
                     <span className="text-xs text-gray-500">{formatDateTime(transaction.date)}</span>
                   </td>
@@ -277,14 +365,14 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
         </table>
       </div>
 
-      {showViewMore && maxRows && data.length > maxRows && (
+      {showViewMore && maxRows && filteredData.length > maxRows && (
         <div className="mt-4 pt-4 border-t border-gray-200 text-center">
           <Button 
             variant="outline" 
             onClick={() => navigate('/transactions')}
             className="w-full"
           >
-            View All Transactions ({data.length})
+            View All Transactions ({filteredData.length})
             <ChevronRight className="w-4 h-4 ml-2" />
           </Button>
         </div>

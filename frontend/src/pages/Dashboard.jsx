@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { CreditCard, AlertTriangle, TrendingUp } from 'lucide-react';
+import { CreditCard, AlertTriangle, TrendingUp, Settings, Upload } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '../components/common/ToastContainer';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
@@ -7,7 +8,7 @@ import AnalyticsCard from '../components/dashboard/AnalyticsCard';
 import TransactionList from '../components/dashboard/TransactionList';
 import FraudAlert from '../components/dashboard/FraudAlert';
 import LiveMonitor from '../components/dashboard/LiveMonitor';
-import LiveMonitorControl from '../components/dashboard/LiveMonitorControl';
+import Button from '../components/common/Button';
 import Card from '../components/common/Card';
 import websocketService from '../services/websocket';
 import sseService from '../services/sse';
@@ -15,6 +16,7 @@ import { formatTransaction } from '../utils/fraudDetection';
 import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const Dashboard = () => {
+  const navigate = useNavigate();
   const toast = useToast();
   const lastNotificationRef = useRef(0);
   
@@ -151,6 +153,103 @@ const Dashboard = () => {
     toast.showInfo('Monitoring stopped', 2000);
   };
 
+  const handleImportCSV = (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Check if it's a CSV file
+    if (!file.name.endsWith('.csv')) {
+      toast.showError('Please select a CSV file', 3000);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const lines = text.split('\n');
+        
+        // Skip header line
+        const dataLines = lines.slice(1).filter(line => line.trim());
+        
+        let imported = 0;
+        const newTransactions = [];
+
+        dataLines.forEach((line) => {
+          // Parse CSV line (handle quoted fields)
+          const fields = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
+          if (!fields || fields.length < 10) return;
+
+          // Clean fields (remove quotes)
+          const cleanFields = fields.map(f => f.replace(/^"(.*)"$/, '$1').trim());
+
+          // Map CSV columns to transaction object
+          const transaction = {
+            trans_date_trans_time: cleanFields[0],
+            cc_num: cleanFields[1],
+            merchant: cleanFields[2],
+            category: cleanFields[3],
+            amt: parseFloat(cleanFields[4]) || 0,
+            first: cleanFields[5],
+            last: cleanFields[6],
+            gender: cleanFields[7],
+            street: cleanFields[8],
+            city: cleanFields[9],
+            state: cleanFields[10] || '',
+            zip: cleanFields[11] || '',
+            lat: parseFloat(cleanFields[12]) || 0,
+            long: parseFloat(cleanFields[13]) || 0,
+            city_pop: parseInt(cleanFields[14]) || 0,
+            job: cleanFields[15] || '',
+            dob: cleanFields[16] || '',
+            trans_num: cleanFields[17] || `TXN-${Date.now()}-${imported}`,
+            unix_time: parseInt(cleanFields[18]) || Date.now(),
+            merch_lat: parseFloat(cleanFields[19]) || 0,
+            merch_long: parseFloat(cleanFields[20]) || 0,
+            is_fraud: parseInt(cleanFields[21]) || 0
+          };
+
+          // Format using our fraud detection utility
+          const formattedTransaction = formatTransaction(transaction);
+          newTransactions.push(formattedTransaction);
+          imported++;
+        });
+
+        // Add to processed transactions
+        setProcessedTransactions(prev => [...newTransactions, ...prev].slice(0, 100));
+
+        // Update stats
+        setLiveStats(prev => {
+          const fraudCount = newTransactions.filter(t => t.isFraud).length;
+          const newProcessed = prev.processed + imported;
+          const newFraudDetected = prev.fraudDetected + fraudCount;
+
+          return {
+            ...prev,
+            processed: newProcessed,
+            fraudDetected: newFraudDetected,
+            reported: newFraudDetected,
+            detectionRate: newProcessed > 0 ? ((newFraudDetected / newProcessed) * 100).toFixed(1) : '0'
+          };
+        });
+
+        toast.showSuccess(`Successfully imported ${imported} transactions`, 3000);
+      } catch (error) {
+        console.error('CSV import error:', error);
+        toast.showError('Failed to import CSV file. Please check the format.', 4000);
+      }
+    };
+
+    reader.onerror = () => {
+      toast.showError('Failed to read file', 3000);
+    };
+
+    reader.readAsText(file);
+    
+    // Reset input so the same file can be selected again
+    event.target.value = '';
+  };
+
   // Show connection status notifications
   useEffect(() => {
     if (connectionStatus === 'connected') {
@@ -200,18 +299,45 @@ const Dashboard = () => {
         
         <main className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
-            {/* Page Title */}
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Real-Time Fraud Detection Dashboard</h1>
-              <p className="text-gray-600">AI/ML SIEM for POS Fraud Alerting System - Live Monitor</p>
+            {/* Page Title with Action Buttons */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Real-Time Fraud Detection Dashboard</h1>
+                <p className="text-gray-600">AI/ML SIEM for POS Fraud Alerting System - Live Monitor</p>
+              </div>
+              <div className="flex items-center gap-3">
+                {/* Import CSV Button */}
+                <label htmlFor="csv-import">
+                  <input
+                    id="csv-import"
+                    type="file"
+                    accept=".csv"
+                    onChange={handleImportCSV}
+                    className="hidden"
+                  />
+                  <Button
+                    variant="secondary"
+                    onClick={() => document.getElementById('csv-import').click()}
+                    className="flex items-center gap-2"
+                  >
+                    <Upload className="w-4 h-4" />
+                    Import CSV
+                  </Button>
+                </label>
+                
+                {/* Configure Monitor Button */}
+                {!isMonitoring && (
+                  <Button
+                    variant="outline"
+                    onClick={() => navigate('/settings')}
+                    className="flex items-center gap-2"
+                  >
+                    <Settings className="w-4 h-4" />
+                    Configure Monitor
+                  </Button>
+                )}
+              </div>
             </div>
-
-            {/* Live Monitor Control */}
-            <LiveMonitorControl 
-              onStart={handleStartMonitoring}
-              onStop={handleStopMonitoring}
-              isRunning={isMonitoring}
-            />
 
             {/* Live Monitor Stats */}
             {isMonitoring && <LiveMonitor connectionStatus={connectionStatus} stats={liveStats} />}

@@ -4,7 +4,8 @@ import {
   AlertTriangle, 
   BarChart3, 
   Shield,
-  ArrowLeft
+  ArrowLeft,
+  Settings
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -21,6 +22,7 @@ const Sidebar = () => {
     else if (path === '/transactions') setActiveItem('transactions');
     else if (path === '/alerts') setActiveItem('alerts');
     else if (path === '/analytics') setActiveItem('analytics');
+    else if (path === '/settings') setActiveItem('settings');
   }, [location]);
   
   const menuItems = [
@@ -28,6 +30,7 @@ const Sidebar = () => {
     { id: 'transactions', icon: CreditCard, label: 'Transactions', badge: null },
     { id: 'alerts', icon: AlertTriangle, label: 'Alerts', badge: '12' },
     { id: 'analytics', icon: BarChart3, label: 'Analytics', badge: null },
+    { id: 'settings', icon: Settings, label: 'Settings', badge: null },
   ];
 
   return (

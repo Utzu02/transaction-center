@@ -1,11 +1,10 @@
 import { useState } from 'react';
-import { Download, Search } from 'lucide-react';
+import { Search } from 'lucide-react';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import TransactionList from '../components/dashboard/TransactionList';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
-import Badge from '../components/common/Badge';
 
 const Transactions = () => {
   const [filterStatus, setFilterStatus] = useState('all');
@@ -26,15 +25,9 @@ const Transactions = () => {
         <main className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
             {/* Page Header */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Transactions</h1>
-                <p className="text-gray-600">View and manage all transaction records</p>
-              </div>
-              <Button variant="primary">
-                <Download className="w-5 h-5" />
-                Export Report
-              </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900 mb-2">Transactions</h1>
+              <p className="text-gray-600">View and manage all transaction records</p>
             </div>
 
             {/* Stats Cards */}
