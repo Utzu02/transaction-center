@@ -1,5 +1,4 @@
 import { Shield, Rocket, Lock, Eye, Zap } from "lucide-react";
-import Button from "../common/Button";
 
 const Hero = ({ onGetStarted }) => {
   return (

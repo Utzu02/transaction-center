@@ -4,7 +4,6 @@ import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import Card from '../components/common/Card';
 import LiveTransactionFeed from '../components/dashboard/LiveTransactionFeed';
-import PerformanceMetrics from '../components/dashboard/PerformanceMetrics';
 import FraudPatterns from '../components/dashboard/FraudPatterns';
 import AgeSegmentAnalysis from '../components/dashboard/AgeSegmentAnalysis';
 import AlertsTimeline from '../components/dashboard/AlertsTimeline';
@@ -122,9 +121,6 @@ const Analytics = () => {
               <AgeSegmentAnalysis transactions={processedTransactions} />
               <LiveTransactionFeed transactions={processedTransactions.slice(-20)} />
             </div>
-
-            {/* Performance Metrics for Live Checker */}
-            {/* <PerformanceMetrics transactions={processedTransactions} liveStats={liveStats} /> */}
 
             {/* Historical Analytics */}
             <Card>

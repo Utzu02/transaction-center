@@ -6,7 +6,6 @@ import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import AnalyticsCard from '../components/dashboard/AnalyticsCard';
 import TransactionList from '../components/dashboard/TransactionList';
-import FraudAlert from '../components/dashboard/FraudAlert';
 import LiveMonitor from '../components/dashboard/LiveMonitor';
 import Button from '../components/common/Button';
 import websocketService from '../services/websocket';
@@ -69,15 +68,13 @@ const Dashboard = () => {
     setIsConnecting(true);
     
     try {
-      console.log('🚀 Starting connection:', { type: connectionType, url: finalUrl, hasKey: !!key });
-      
       if (connectionType === 'sse') {
         sseService.connect(finalUrl, key);
       } else {
         websocketService.connect(finalUrl);
       }
     } catch (error) {
-      console.error('❌ Connection error:', error);
+      console.error('Connection error:', error);
       toast.showError(`Failed to start monitoring: ${error.message}`, 4000);
       setIsConnecting(false);
     }
@@ -124,8 +121,6 @@ const Dashboard = () => {
 
     // Subscribe to transaction events for both services
     const handleTransaction = (transaction) => {
-      console.log('Received transaction:', transaction);
-      
       // Format and analyze transaction
       const formattedTransaction = formatTransaction(transaction);
       const startTime = Date.now();
@@ -155,8 +150,6 @@ const Dashboard = () => {
 
       // Auto-flag if fraud detected
       if (connectionType === 'sse' && formattedTransaction.isFraud) {
-        console.log(`🚨 Fraud detected: Score ${formattedTransaction.riskScore} - Pattern: ${formattedTransaction.pattern}`);
-        
         // Show notification (max once per 3 seconds to avoid spam)
         const now = Date.now();
         if (now - lastNotificationRef.current > 3000) {
@@ -174,11 +167,8 @@ const Dashboard = () => {
             streamConfig.apiKey,
             transaction.trans_num,
             1 // Flag as fraud
-          ).then(result => {
-            console.log('Flag response:', result);
-            if (result.success) {
-              console.log('✅ Successfully flagged transaction');
-            }
+          ).catch(error => {
+            console.error('Failed to flag transaction:', error);
           });
         }
       }
@@ -304,25 +294,6 @@ const Dashboard = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [connectionStatus]);
 
-  const mockAlerts = [
-    {
-      title: 'Suspicious Transaction Detected',
-      description: 'Multiple failed payment attempts from the same IP in the last 5 minutes.',
-      severity: 'high',
-      time: '2 minutes ago',
-      transactionId: 'TXN-001238',
-      amount: '€2,500.00'
-    },
-    {
-      title: 'Unusual Pattern Identified',
-      description: 'Unusually large amount compared to customer history.',
-      severity: 'medium',
-      time: '15 minutes ago',
-      transactionId: 'TXN-001235',
-      amount: '€856.00'
-    }
-  ];
-
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-50">
       <Sidebar />
@@ -416,17 +387,6 @@ const Dashboard = () => {
                 color="success"
                 tooltip="Percentage of transactions identified as fraud. Target: high accuracy, low false positives."
               />
-            </div>
-
-
-            {/* Alerts */}
-            <div>
-              <h2 className="text-xl font-bold text-gray-900 mb-4">Active Alerts</h2>
-              <div className="space-y-4">
-                {mockAlerts.map((alert, index) => (
-                  <FraudAlert key={index} alert={alert} />
-                ))}
-              </div>
             </div>
 
             {/* Transaction List */}

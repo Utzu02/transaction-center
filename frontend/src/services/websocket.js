@@ -13,7 +13,6 @@ class WebSocketService {
       this.ws = new WebSocket(url);
       
       this.ws.onopen = () => {
-        console.log('WebSocket connected');
         this.reconnectAttempts = 0;
         this.notifyListeners('connection', { status: 'connected' });
       };
