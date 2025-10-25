@@ -5,7 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const FraudPatterns = ({ transactions = [] }) => {
   const [patterns, setPatterns] = useState([]);
-  const [timeframe, setTimeframe] = useState(3600); // 1 hour in seconds
+  const [timeframe, setTimeframe] = useState(7200); // 2 hours in seconds
 
   useEffect(() => {
     // Calculate patterns from real transactions
@@ -51,26 +51,37 @@ const FraudPatterns = ({ transactions = [] }) => {
 
   const totalCount = patterns.reduce((sum, p) => sum + p.count, 0);
 
+  const getTimeframeLabel = () => {
+    switch(timeframe) {
+      case 7200: return '2h';
+      case 14400: return '4h';
+      case 28800: return '8h';
+      case 86400: return '1d';
+      default: return '2h';
+    }
+  };
+
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
         <div>
           <h3 className="text-lg font-bold text-gray-900">Top 5 Fraud Patterns</h3>
           <p className="text-sm text-gray-600">
-            Last {timeframe === 3600 ? '1 hour' : timeframe === 7200 ? '2 hours' : '4 hours'} • {totalCount} fraud cases
+            Last {getTimeframeLabel()} • {totalCount} fraud cases
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <select
             value={timeframe}
             onChange={(e) => setTimeframe(parseInt(e.target.value))}
-            className="text-sm border border-gray-300 rounded-lg px-3 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            className="text-sm font-semibold bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 text-blue-700 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:shadow-md cursor-pointer"
           >
-            <option value="3600">Last Hour</option>
-            <option value="7200">Last 2 Hours</option>
-            <option value="14400">Last 4 Hours</option>
+            <option value="7200">2h</option>
+            <option value="14400">4h</option>
+            <option value="28800">8h</option>
+            <option value="86400">1d</option>
           </select>
-          <TrendingUp className="w-6 h-6 text-primary-600" />
+          <TrendingUp className="w-5 h-5 text-blue-600" />
         </div>
       </div>
 

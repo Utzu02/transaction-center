@@ -6,23 +6,24 @@ import {
   Shield,
   Settings
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const [activeItem, setActiveItem] = useState('dashboard');
 
-  // Update active item based on current route
-  useEffect(() => {
+  // Derive active item directly from location - no state needed
+  const getActiveItem = () => {
     const path = location.pathname;
-    if (path === '/dashboard') setActiveItem('dashboard');
-    else if (path === '/transactions') setActiveItem('transactions');
-    else if (path === '/alerts') setActiveItem('alerts');
-    else if (path === '/analytics') setActiveItem('analytics');
-    else if (path === '/settings') setActiveItem('settings');
-  }, [location]);
+    if (path === '/dashboard') return 'dashboard';
+    if (path === '/transactions') return 'transactions';
+    if (path === '/alerts') return 'alerts';
+    if (path === '/analytics') return 'analytics';
+    if (path === '/settings') return 'settings';
+    return 'dashboard';
+  };
+
+  const activeItem = getActiveItem();
   
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', badge: null },
@@ -57,7 +58,6 @@ const Sidebar = () => {
             <li key={item.id}>
               <button
                 onClick={() => {
-                  setActiveItem(item.id);
                   navigate(`/${item.id === 'dashboard' ? 'dashboard' : item.id}`);
                 }}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 ${

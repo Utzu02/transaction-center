@@ -240,11 +240,6 @@ const TransactionList = ({ transactions = [], filter = 'all', showExport = true,
             {selectedTransactions.size > 0 ? (
               <>
                 {selectedTransactions.size} transaction{selectedTransactions.size !== 1 ? 's' : ''} selected
-                {someSelected && (
-                  <span className="ml-2 text-xs text-blue-600 font-semibold">
-                    • Click checkbox to deselect
-                  </span>
-                )}
               </>
             ) : (
               <>No transactions selected</>
