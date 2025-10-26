@@ -31,7 +31,7 @@ const TransactionDetail = () => {
             merchant: tx.merchant || 'Unknown',
             merchantCategory: tx.category || 'Unknown',
             amount: tx.amt ? `$${tx.amt.toFixed(2)}` : '$0.00',
-            status: tx.status || 'completed',
+            status: tx.status || 'accepted',
             riskScore: tx.risk_score || 0,
             date: tx.trans_date && tx.trans_time ? `${tx.trans_date} ${tx.trans_time}` : tx.created_at,
             transNum: tx.trans_num || tx.id,
@@ -113,7 +113,7 @@ const TransactionDetail = () => {
   const displayTransaction = transaction;
   
   const getStatusInfo = (status) => {
-    if (status === 'completed') {
+    if (status === 'completed' || status === 'accepted') {
       return {
         icon: CheckCircle,
         color: 'text-success-600',

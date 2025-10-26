@@ -6,13 +6,15 @@ import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
 const AlertsTimeline = ({ transactions = [] }) => {
   const [timelineData, setTimelineData] = useState([]);
   const [stats, setStats] = useState({ total: 0, peak: 0, avg: 0, current: 0 });
+  const [timeframe, setTimeframe] = useState(24); // Default to 24 hours
 
   useEffect(() => {
-    // Process last 2 hours of fraud alerts
+    // Process fraud alerts based on selected timeframe
     const now = Date.now();
-    const twoHoursAgo = now - (2 * 3600 * 1000); // milliseconds
+    const timeframeMs = timeframe * 3600 * 1000; // convert hours to milliseconds
+    const cutoffTime = now - timeframeMs;
     
-    // Filter fraud transactions from last 2 hours
+    // Filter fraud transactions from selected timeframe
     const fraudTransactions = transactions.filter(t => {
       // Consistent fraud detection: check is_fraud, isFraud, OR status === 'blocked' or 'unknown'
       const isFraud = t.isFraud || t.is_fraud || t.status === 'blocked' || t.status === 'unknown';
@@ -32,15 +34,16 @@ const AlertsTimeline = ({ transactions = [] }) => {
         return true; // Include if no timestamp
       }
       
-      return transTime >= twoHoursAgo;
+      return transTime >= cutoffTime;
     });
 
-    // Group by 15-minute intervals
+    // Group by intervals based on timeframe
     const intervals = [];
-    const intervalDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
+    const numIntervals = 12; // Always show 12 intervals
+    const intervalDuration = timeframeMs / numIntervals;
     
-    for (let i = 0; i < 8; i++) { // 8 intervals = 2 hours
-      const intervalStart = now - ((8 - i) * intervalDuration);
+    for (let i = 0; i < numIntervals; i++) {
+      const intervalStart = now - ((numIntervals - i) * intervalDuration);
       const intervalEnd = intervalStart + intervalDuration;
       
       const count = fraudTransactions.filter(t => {
@@ -60,14 +63,25 @@ const AlertsTimeline = ({ transactions = [] }) => {
         return transTime >= intervalStart && transTime < intervalEnd;
       }).length;
 
-      const label = i === 7 ? 'Now' : 
-                    i === 6 ? '15m' :
-                    i === 5 ? '30m' :
-                    i === 4 ? '45m' :
-                    i === 3 ? '1h' :
-                    i === 2 ? '1h 15m' :
-                    i === 1 ? '1h 30m' :
-                    '2h';
+      // Generate label based on timeframe
+      let label;
+      if (i === numIntervals - 1) {
+        label = 'Now';
+      } else {
+        const hoursAgo = Math.round((numIntervals - i) * (timeframe / numIntervals));
+        if (timeframe <= 2) {
+          // For short timeframes, show minutes
+          const minutesAgo = Math.round((numIntervals - i) * (timeframe * 60 / numIntervals));
+          label = `${minutesAgo}m`;
+        } else if (timeframe <= 24) {
+          // For medium timeframes, show hours
+          label = `${hoursAgo}h`;
+        } else {
+          // For long timeframes, show days
+          const daysAgo = Math.round(hoursAgo / 24);
+          label = `${daysAgo}d`;
+        }
+      }
 
       intervals.push({
         time: label,
@@ -85,7 +99,7 @@ const AlertsTimeline = ({ transactions = [] }) => {
     const current = intervals[intervals.length - 1]?.count || 0;
 
     setStats({ total, peak, avg: parseFloat(avg), current });
-  }, [transactions]);
+  }, [transactions, timeframe]);
 
   const getTrend = () => {
     if (timelineData.length < 2) return null;
@@ -104,18 +118,32 @@ const AlertsTimeline = ({ transactions = [] }) => {
             <Clock className="w-5 h-5 text-primary-600" />
             Fraud Alerts Timeline
           </h3>
-          <p className="text-sm text-gray-600">Last 2 hours • {timelineData.length} intervals</p>
+          <p className="text-sm text-gray-600">Last {timeframe}h • {timelineData.length} intervals</p>
         </div>
-        <div className="text-right">
-          <div className="text-3xl font-bold text-danger-600">{stats.total}</div>
-          <div className="flex items-center justify-end gap-1 text-xs text-gray-500">
-            Total Alerts
-            {trend !== null && (
-              <span className={`flex items-center ${trend > 0 ? 'text-red-600' : trend < 0 ? 'text-green-600' : 'text-gray-500'}`}>
-                {trend > 0 ? <TrendingUp className="w-3 h-3" /> : trend < 0 ? <TrendingDown className="w-3 h-3" /> : null}
-                {trend !== 0 && `${Math.abs(trend)}`}
-              </span>
-            )}
+        <div className="flex items-center gap-4">
+          <select
+            value={timeframe}
+            onChange={(e) => setTimeframe(parseInt(e.target.value))}
+            className="text-sm font-semibold bg-gradient-to-r from-purple-50 to-pink-50 border-2 border-purple-200 text-purple-700 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all hover:shadow-md cursor-pointer"
+          >
+            <option value="2">Last 2h</option>
+            <option value="6">Last 6h</option>
+            <option value="12">Last 12h</option>
+            <option value="24">Last 24h</option>
+            <option value="168">Last 7d</option>
+            <option value="720">Last 30d</option>
+          </select>
+          <div className="text-right">
+            <div className="text-3xl font-bold text-danger-600">{stats.total}</div>
+            <div className="flex items-center justify-end gap-1 text-xs text-gray-500">
+              Total Alerts
+              {trend !== null && (
+                <span className={`flex items-center ${trend > 0 ? 'text-red-600' : trend < 0 ? 'text-green-600' : 'text-gray-500'}`}>
+                  {trend > 0 ? <TrendingUp className="w-3 h-3" /> : trend < 0 ? <TrendingDown className="w-3 h-3" /> : null}
+                  {trend !== 0 && `${Math.abs(trend)}`}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -168,13 +196,13 @@ const AlertsTimeline = ({ transactions = [] }) => {
               <p className="text-2xl font-bold text-primary-600">
                 {stats.avg}
               </p>
-              <p className="text-xs text-gray-600 mt-1">Avg per 15min</p>
+              <p className="text-xs text-gray-600 mt-1">Avg per interval</p>
             </div>
             <div className="text-center p-3 bg-danger-50 rounded-lg border border-danger-200">
               <p className="text-2xl font-bold text-danger-600">
                 {stats.current}
               </p>
-              <p className="text-xs text-gray-600 mt-1">Current (15min)</p>
+              <p className="text-xs text-gray-600 mt-1">Latest interval</p>
             </div>
           </div>
         </>

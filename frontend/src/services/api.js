@@ -100,7 +100,7 @@ class ApiService {
 
   /**
    * Get transactions by status
-   * @param {string} status - 'completed', 'blocked', or 'pending'
+   * @param {string} status - 'accepted', 'blocked', or 'pending'
    * @param {number} limit - Number of transactions
    */
   async getTransactionsByStatus(status, limit = 100) {
@@ -127,6 +127,15 @@ class ApiService {
    */
   async deleteTransaction(transNum) {
     return this.request(`/api/transactions/${transNum}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Delete all transactions
+   */
+  async deleteAllTransactions() {
+    return this.request('/api/transactions/delete-all', {
       method: 'DELETE',
     });
   }
@@ -268,7 +277,7 @@ class ApiService {
    * Delete all notifications
    */
   async deleteAllNotifications() {
-    return this.request('/api/notifications/all', {
+    return this.request('/api/notifications/delete-all', {
       method: 'DELETE',
     });
   }

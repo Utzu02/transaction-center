@@ -7,119 +7,136 @@ from datetime import datetime
 from utils.database import get_db
 from utils.validators import validate_transaction
 from services.notification_service import NotificationService
+import threading
 
 class TransactionService:
     """Service class for transaction operations"""
     
     @staticmethod
-    def add_transaction(transaction_data):
+    def add_transaction(transaction_data, skip_validation=False, skip_duplicate_check=False):
         """
-        Add a new transaction to the database
+        Add a new transaction to the database (OPTIMIZED FOR SPEED)
         
         Args:
             transaction_data (dict): Transaction data
+            skip_validation (bool): Skip validation for faster processing
+            skip_duplicate_check (bool): Skip duplicate check for faster processing
             
         Returns:
             dict: Result with success status and transaction ID or error
         """
-        # Validate transaction data
-        is_valid, error = validate_transaction(transaction_data)
-        if not is_valid:
-            return {'success': False, 'error': error}
+        # Fast validation (optional - skip for maximum speed)
+        if not skip_validation:
+            is_valid, error = validate_transaction(transaction_data)
+            if not is_valid:
+                return {'success': False, 'error': error}
         
         db = get_db()
         
-        # Check if transaction already exists
-        existing = db.transactions.find_one({'trans_num': transaction_data['trans_num']})
-        if existing:
-            return {'success': False, 'error': 'Transaction already exists'}
+        # Skip duplicate check for maximum speed (optional)
+        # Note: MongoDB will raise duplicate key error if trans_num already exists due to unique index
+        if not skip_duplicate_check:
+            existing = db.transactions.find_one({'trans_num': transaction_data['trans_num']})
+            if existing:
+                return {'success': False, 'error': 'Transaction already exists'}
         
-        # Prepare transaction document with all fields
+        # Prepare transaction document with all fields (optimized)
+        is_fraud = bool(transaction_data.get('is_fraud', False))
+        
+        # Determine status based on fraud detection
+        # Convert 'unknown' status to 'blocked' (treat as suspicious)
+        # Otherwise, set to 'blocked' if fraud, 'accepted' if not
+        if 'status' in transaction_data:
+            status = transaction_data['status']
+            # Convert unknown to blocked
+            if status == 'unknown':
+                status = 'blocked'
+                is_fraud = True  # Treat unknown as fraud
+        else:
+            status = 'blocked' if is_fraud else 'accepted'
+        
+        # OPTIMIZED: Build transaction document efficiently
         transaction = {
-            # Core transaction fields (required)
+            # Core fields (always present)
             'trans_num': transaction_data['trans_num'],
             'amt': float(transaction_data['amt']),
             'merchant': transaction_data['merchant'],
-            
-            # Transaction details
-            'category': transaction_data.get('category'),
-            'status': transaction_data.get('status', 'completed'),
-            'is_fraud': bool(transaction_data.get('is_fraud', False)),
-            'risk_score': transaction_data.get('risk_score', 0),
-            
-            # Date/Time information
-            'trans_date': transaction_data.get('trans_date'),
-            'trans_time': transaction_data.get('trans_time'),
-            'unix_time': int(transaction_data['unix_time']) if transaction_data.get('unix_time') else None,
-            'date': transaction_data.get('date'),  # Combined date field (legacy)
-            
-            # Customer personal information
-            'ssn': transaction_data.get('ssn'),
-            'cc_num': transaction_data.get('cc_num'),
-            'acct_num': transaction_data.get('acct_num'),
-            'first': transaction_data.get('first'),
-            'last': transaction_data.get('last'),
-            'gender': transaction_data.get('gender'),
-            'dob': transaction_data.get('dob'),
-            'job': transaction_data.get('job'),
-            
-            # Customer address/location
-            'street': transaction_data.get('street'),
-            'city': transaction_data.get('city'),
-            'state': transaction_data.get('state'),
-            'zip': transaction_data.get('zip'),
-            'lat': float(transaction_data['lat']) if transaction_data.get('lat') is not None else None,
-            'long': float(transaction_data['long']) if transaction_data.get('long') is not None else None,
-            'city_pop': int(transaction_data['city_pop']) if transaction_data.get('city_pop') else None,
-            
-            # Merchant location
-            'merch_lat': float(transaction_data['merch_lat']) if transaction_data.get('merch_lat') is not None else None,
-            'merch_long': float(transaction_data['merch_long']) if transaction_data.get('merch_long') is not None else None,
-            
-            # Legacy/computed fields
-            'customer': transaction_data.get('customer'),  # Full name if provided
-            'location': transaction_data.get('location'),  # Formatted location string
-            
-            # System timestamps
+            'status': status,
+            'is_fraud': is_fraud,
             'created_at': datetime.utcnow(),
             'updated_at': datetime.utcnow()
         }
         
-        # Insert transaction
+        # Add optional fields directly (avoid repeated .get() calls)
+        optional_fields = [
+            'category', 'risk_score', 'trans_date', 'trans_time', 'unix_time', 'date',
+            'ssn', 'cc_num', 'acct_num', 'first', 'last', 'gender', 'dob', 'job',
+            'street', 'city', 'state', 'zip', 'lat', 'long', 'city_pop',
+            'merch_lat', 'merch_long', 'customer', 'location',
+            'fraud_probability', 'confidence', 'pattern', 'distance', 'processing_time'
+        ]
+        
+        # Bulk update with all available fields (faster than individual checks)
+        transaction.update({
+            k: transaction_data[k] 
+            for k in optional_fields 
+            if k in transaction_data and transaction_data[k] is not None
+        })
+        
+        # Convert numeric fields if present (optimized)
+        if 'unix_time' in transaction and transaction['unix_time']:
+            transaction['unix_time'] = int(transaction['unix_time'])
+        if 'city_pop' in transaction and transaction['city_pop']:
+            transaction['city_pop'] = int(transaction['city_pop'])
+        
+        # Convert coordinate fields (only if present)
+        for coord_field in ['lat', 'long', 'merch_lat', 'merch_long']:
+            if coord_field in transaction and transaction[coord_field] is not None:
+                transaction[coord_field] = float(transaction[coord_field])
+        
+        # Insert transaction (optimized - single operation)
         try:
             result = db.transactions.insert_one(transaction)
             transaction_id = str(result.inserted_id)
             trans_num = transaction_data['trans_num']
             
-            # Create notification if fraud detected
-            if transaction.get('is_fraud'):
-                fraud_probability = transaction_data.get('fraud_probability', 0)
-                confidence = transaction_data.get('confidence', 0)
+            # Create notification in separate thread (completely async - doesn't block at all!)
+            if transaction.get('is_fraud') or status == 'blocked' or status == 'unknown':
+                def create_notification_async():
+                    try:
+                        fraud_probability = transaction_data.get('fraud_probability', 0)
+                        confidence = transaction_data.get('confidence', 0)
+                        pattern = transaction_data.get('pattern', 'Unknown pattern')
+                        
+                        # Quick severity determination
+                        severity = 'high' if (confidence >= 0.7 or fraud_probability >= 0.7) else 'medium' if (confidence >= 0.4 or fraud_probability >= 0.4) else 'low'
+                        severity_emoji = '🔴' if severity == 'high' else '🟡' if severity == 'medium' else '🟢'
+                        
+                        # Create optimized notification (minimal data)
+                        notification_data = {
+                            'title': f'🚨 Fraud Alert - ${transaction["amt"]:.2f}',
+                            'message': f'{severity_emoji} Suspicious transaction BLOCKED at {transaction["merchant"]}. Amount: ${transaction["amt"]:.2f}. Pattern: {pattern}.',
+                            'text': f'Fraud: {transaction["merchant"]} - ${transaction["amt"]:.2f}',
+                            'type': severity,
+                            'transaction_id': trans_num,
+                            'amount': transaction['amt'],
+                            'merchant': transaction['merchant'],
+                            'category': transaction.get('category'),
+                            'fraud_probability': fraud_probability,
+                            'confidence': confidence,
+                            'pattern': pattern,
+                            'status': 'blocked'
+                        }
+                        
+                        # Add notification
+                        NotificationService.add_notification(notification_data)
+                    except Exception as notif_error:
+                        # Don't fail if notification fails
+                        print(f"⚠️ Notification creation failed (async): {notif_error}")
                 
-                # Determine severity based on probability and confidence
-                if confidence >= 0.7:
-                    severity = 'high'
-                elif confidence >= 0.4:
-                    severity = 'medium'
-                else:
-                    severity = 'low'
-                
-                notification_data = {
-                    'title': f'🚨 Fraud Alert - ${transaction["amt"]:.2f}',
-                    'message': f'Suspicious transaction detected at {transaction["merchant"]}. Amount: ${transaction["amt"]:.2f}. Category: {transaction.get("category", "N/A")}. Confidence: {confidence:.1%}',
-                    'text': f'Fraud detected: {transaction["merchant"]} - ${transaction["amt"]:.2f}',
-                    'type': severity,
-                    'transaction_id': trans_num,
-                    'amount': transaction['amt'],
-                    'merchant': transaction['merchant'],
-                    'category': transaction.get('category'),
-                    'fraud_probability': fraud_probability,
-                    'confidence': confidence
-                }
-                
-                # Add notification to database
-                NotificationService.add_notification(notification_data)
-                print(f"✅ Created fraud notification for transaction {trans_num}")
+                # Start notification creation in background thread (non-blocking)
+                thread = threading.Thread(target=create_notification_async, daemon=True)
+                thread.start()
             
             return {
                 'success': True,
@@ -163,6 +180,12 @@ class TransactionService:
                 tx['_id'] = str(tx['_id'])
                 tx['id'] = tx['trans_num']  # Use trans_num as ID for frontend
                 
+                # Ensure both isFraud and is_fraud exist for frontend consistency
+                if 'is_fraud' in tx:
+                    tx['isFraud'] = tx['is_fraud']
+                elif 'isFraud' in tx:
+                    tx['is_fraud'] = tx['isFraud']
+                
                 # Format dates
                 if 'created_at' in tx:
                     tx['created_at'] = tx['created_at'].isoformat()
@@ -203,6 +226,12 @@ class TransactionService:
             # Format transaction
             transaction['_id'] = str(transaction['_id'])
             transaction['id'] = transaction['trans_num']
+            
+            # Ensure both isFraud and is_fraud exist for frontend consistency
+            if 'is_fraud' in transaction:
+                transaction['isFraud'] = transaction['is_fraud']
+            elif 'isFraud' in transaction:
+                transaction['is_fraud'] = transaction['isFraud']
             
             if 'created_at' in transaction:
                 transaction['created_at'] = transaction['created_at'].isoformat()
@@ -307,6 +336,30 @@ class TransactionService:
                 return {'success': False, 'error': 'Transaction not found'}
             
             return {'success': True}
+        except Exception as e:
+            return {'success': False, 'error': str(e)}
+    
+    @staticmethod
+    def delete_all_transactions():
+        """
+        Delete all transactions from the database
+        
+        Returns:
+            dict: Result with success status and count of deleted transactions
+        """
+        db = get_db()
+        
+        try:
+            result = db.transactions.delete_many({})
+            deleted_count = result.deleted_count
+            
+            print(f"🗑️ Deleted {deleted_count} transactions from database")
+            
+            return {
+                'success': True,
+                'deleted_count': deleted_count,
+                'message': f'Successfully deleted {deleted_count} transactions'
+            }
         except Exception as e:
             return {'success': False, 'error': str(e)}
 

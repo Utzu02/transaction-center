@@ -1,15 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp, Eye } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import Card from '../common/Card';
 import Badge from '../common/Badge';
-import { useNavigate } from 'react-router-dom';
-import TransactionPreviewModal from '../common/TransactionPreviewModal';
 
 const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
-  const navigate = useNavigate();
   const feedRef = useRef(null);
   const [autoScroll, setAutoScroll] = useState(true);
-  const [previewTransaction, setPreviewTransaction] = useState(null);
 
   // Auto-scroll to bottom when new transactions arrive
   useEffect(() => {
@@ -137,38 +133,11 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
                   )}
                 </div>
 
-                <div className="flex flex-col gap-2 ml-4">
-                  <div className="text-right">
-                    <p className="text-xs text-gray-500 mb-1">Risk Score</p>
-                    <p className={`text-2xl font-bold ${
-                      transaction.riskScore >= 70 ? 'text-red-600' :
-                      transaction.riskScore >= 50 ? 'text-orange-600' :
-                      transaction.riskScore >= 30 ? 'text-yellow-600' :
-                      'text-green-600'
-                    }`}>
-                      {transaction.riskScore}
-                    </p>
-                  </div>
-                  
-                  <button
-                    onClick={() => setPreviewTransaction(transaction)}
-                    className="group p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105"
-                    title="Quick Preview"
-                  >
-                    <Eye className="w-4 h-4 text-white" />
-                  </button>
-                </div>
               </div>
             </div>
           ))
         )}
       </div>
-      
-      <TransactionPreviewModal 
-        isOpen={!!previewTransaction}
-        onClose={() => setPreviewTransaction(null)}
-        transaction={previewTransaction}
-      />
 
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar {

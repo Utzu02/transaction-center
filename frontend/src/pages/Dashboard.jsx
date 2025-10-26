@@ -48,20 +48,16 @@ const Dashboard = () => {
       if (response.success && response.transactions) {
         console.log(`✅ Loaded ${response.transactions.length} transactions from database`);
         
-        // Transform backend data to frontend format
+        // Keep ALL original backend fields and add frontend helpers
         const formatted = response.transactions.map(tx => ({
-          ...tx,  // Keep all original backend fields FIRST
-          // Only add frontend-specific fields, don't override existing backend fields
+          ...tx,  // Keep ALL original backend fields
           id: tx.trans_num || tx.id,
-          ...(tx.amt !== undefined && tx.amt !== null && { amount: tx.amt }),  // Only set amount if amt exists
-          ...(tx.merchant && { merchant: tx.merchant }),
-          ...(tx.status && { status: tx.status }),
-          ...(tx.risk_score !== undefined && { riskScore: tx.risk_score }),
-          ...(tx.unix_time && { timestamp: tx.unix_time }),
-          ...(tx.category && { category: tx.category }),
-          ...(tx.first && tx.last && { customer: `${tx.first} ${tx.last}` }),
-          ...(tx.city && tx.state && { location: `${tx.city}, ${tx.state}` }),
-          isFraud: tx.is_fraud || tx.isFraud || tx.status === 'blocked' || tx.status === 'unknown'  // Consistent fraud detection
+          amount: tx.amt,  // Keep amt field from backend
+          riskScore: tx.risk_score || 0,
+          timestamp: tx.unix_time || Math.floor(new Date(tx.created_at).getTime() / 1000),
+          customer: tx.first && tx.last ? `${tx.first} ${tx.last}` : '',
+          location: tx.city && tx.state ? `${tx.city}, ${tx.state}` : '',
+          isFraud: tx.is_fraud || tx.isFraud || tx.status === 'blocked' || tx.status === 'unknown'
         }));
         
         setDbTransactions(formatted);
@@ -170,18 +166,30 @@ const Dashboard = () => {
       const formattedTransaction = formatTransaction(transaction);
       const startTime = Date.now();
       
-      // Save to database automatically
-      const saveToDatabase = async () => {
+      // Send to backend for processing (fraud detection + save)
+      // Backend will analyze, detect fraud, save to DB, and create alerts if needed
+      const processTransaction = async () => {
         try {
-          await apiService.createTransaction(transaction);
-          console.log(`✅ Saved transaction ${transaction.trans_num || transaction.id} to database`);
-          // Refresh DB transactions after save
-          fetchDatabaseTransactions();
+          const response = await fetch(`${apiService.baseUrl}/api/transactions/process`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(transaction)
+          });
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log(`✅ Transaction processed: ${transaction.trans_num}`, result);
+            
+            // Refresh DB transactions to show the newly saved transaction
+            setTimeout(() => fetchDatabaseTransactions(), 500);
+          } else {
+            console.error(`❌ Failed to process transaction: ${response.status}`);
+          }
         } catch (error) {
-          console.error('❌ Failed to save transaction to database:', error);
+          console.error('❌ Error processing transaction:', error);
         }
       };
-      saveToDatabase();
+      processTransaction();
       
       // Store transaction
       setProcessedTransactions(prev => [...prev, formattedTransaction].slice(-100)); // Keep last 100
@@ -259,7 +267,7 @@ const Dashboard = () => {
     }
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       try {
         const text = e.target.result;
         const lines = text.split('\n');
@@ -268,19 +276,28 @@ const Dashboard = () => {
         const dataLines = lines.slice(1).filter(line => line.trim());
         
         let imported = 0;
+        let savedCount = 0;
         const newTransactions = [];
 
-        dataLines.forEach((line) => {
-          // Parse CSV line (handle quoted fields)
-          const fields = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g);
-          if (!fields || fields.length < 10) return;
+        // Use for...of to properly await async operations
+        for (const line of dataLines) {
+          // Parse CSV line with pipe delimiter (|)
+          const fields = line.split('|');
+          if (!fields || fields.length < 10) continue;
 
-          // Clean fields (remove quotes)
-          const cleanFields = fields.map(f => f.replace(/^"(.*)"$/, '$1').trim());
+          // Clean fields (trim whitespace and remove quotes if any)
+          const cleanFields = fields.map(f => f.trim().replace(/^"(.*)"$/, '$1'));
+
+          // Split trans_date_trans_time if it exists
+          const transDateTime = cleanFields[0] || '';
+          const [trans_date, trans_time] = transDateTime.includes(' ') 
+            ? transDateTime.split(' ') 
+            : [cleanFields[0], ''];
 
           // Map CSV columns to transaction object
           const transaction = {
-            trans_date_trans_time: cleanFields[0],
+            trans_date: trans_date,
+            trans_time: trans_time,
             cc_num: cleanFields[1],
             merchant: cleanFields[2],
             category: cleanFields[3],
@@ -298,17 +315,27 @@ const Dashboard = () => {
             job: cleanFields[15] || '',
             dob: cleanFields[16] || '',
             trans_num: cleanFields[17] || `TXN-${Date.now()}-${imported}`,
-            unix_time: parseInt(cleanFields[18]) || Date.now(),
+            unix_time: parseInt(cleanFields[18]) || Math.floor(Date.now() / 1000),
             merch_lat: parseFloat(cleanFields[19]) || 0,
             merch_long: parseFloat(cleanFields[20]) || 0,
-            is_fraud: parseInt(cleanFields[21]) || 0
+            is_fraud: parseInt(cleanFields[21]) || 0,
+            isFraud: parseInt(cleanFields[21]) || 0
           };
+
+          // Save to database
+          try {
+            await apiService.createTransaction(transaction);
+            console.log(`✅ Saved CSV transaction ${transaction.trans_num} to database`);
+            savedCount++;
+          } catch (error) {
+            console.error(`❌ Failed to save CSV transaction: ${error.message}`);
+          }
 
           // Format using our fraud detection utility
           const formattedTransaction = formatTransaction(transaction);
           newTransactions.push(formattedTransaction);
           imported++;
-        });
+        }
 
         // Add to processed transactions
         setProcessedTransactions(prev => [...newTransactions, ...prev].slice(0, 100));
@@ -328,9 +355,9 @@ const Dashboard = () => {
           };
         });
 
-        toast.showSuccess(`Successfully imported ${imported} transactions`, 3000);
+        toast.showSuccess(`Successfully imported ${imported} transactions (${savedCount} saved to database)`, 4000);
         
-        // Refresh database transactions in case any were added manually
+        // Refresh database transactions to show newly imported data
         fetchDatabaseTransactions();
       } catch (error) {
         console.error('CSV import error:', error);
@@ -496,7 +523,7 @@ const Dashboard = () => {
               />
             </div>
 
-            {/* Transaction List */}
+            {/* Transaction List - Most Recent First */}
             <TransactionList 
               transactions={[
                 // Merge database transactions with live stream transactions
@@ -509,7 +536,8 @@ const Dashboard = () => {
                   location: t.location,
                   riskScore: t.riskScore,
                   status: t.status,
-                  date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()
+                  date: t.created_at || (t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()),
+                  timestamp: t.timestamp || Math.floor(new Date(t.created_at).getTime() / 1000)
                 })),
                 ...processedTransactions.map(t => ({
                   id: t.id,
@@ -519,10 +547,14 @@ const Dashboard = () => {
                   category: t.category,
                   location: t.location,
                   riskScore: t.riskScore,
-                  status: t.isFraud ? 'blocked' : 'completed',
-                  date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()
+                  status: t.isFraud ? 'blocked' : 'accepted',
+                  date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString(),
+                  timestamp: t.timestamp || Math.floor(Date.now() / 1000)
                 }))
-              ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5)}
+              ]
+              // Sort by timestamp (most recent first) and take first 5
+              .sort((a, b) => b.timestamp - a.timestamp)
+              .slice(0, 5)}
               maxRows={5}
               showExport={true}
               showViewMore={true}

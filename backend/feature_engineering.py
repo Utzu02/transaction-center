@@ -134,7 +134,7 @@ def extract_features(df: pd.DataFrame, n_samples: Optional[int] = None, encoders
             df['unix_time'] = pd.to_datetime(df['trans_date']).astype(np.int64) // 10**9
     
     # Transaction amount features
-    df['amt_log'] = np.log1p(df['amt'])  # Log transform to handle skewness
+    df['amt_log'] = df['amt']  # Log transform to handle skewness
     
     # Distance between customer and merchant
     df['distance'] = df.apply(

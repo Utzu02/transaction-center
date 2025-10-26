@@ -5,12 +5,11 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 
 const FraudPatterns = ({ transactions = [] }) => {
   const [patterns, setPatterns] = useState([]);
-  const [timeframe, setTimeframe] = useState(7200); // 2 hours in seconds
+  const [timeframe, setTimeframe] = useState('all'); // Default to all time
 
   useEffect(() => {
     // Calculate patterns from real transactions
     const now = Date.now();
-    const cutoffTime = now - (timeframe * 1000); // convert seconds to milliseconds
     
     // Filter fraud transactions
     const fraudTransactions = transactions.filter(t => {
@@ -18,7 +17,11 @@ const FraudPatterns = ({ transactions = [] }) => {
       const isFraud = t.isFraud || t.is_fraud || t.status === 'blocked' || t.status === 'unknown';
       if (!isFraud) return false;
       
-      // Check timeframe
+      // If timeframe is "all", include all fraud transactions
+      if (timeframe === 'all') return true;
+      
+      // Check timeframe for specific durations
+      const cutoffTime = now - (parseInt(timeframe) * 1000); // convert seconds to milliseconds
       let transTime;
       if (t.timestamp) {
         transTime = typeof t.timestamp === 'number' ? t.timestamp * 1000 : new Date(t.timestamp).getTime();
@@ -113,11 +116,14 @@ const FraudPatterns = ({ transactions = [] }) => {
 
   const getTimeframeLabel = () => {
     switch(timeframe) {
-      case 7200: return '2h';
-      case 14400: return '4h';
-      case 28800: return '8h';
-      case 86400: return '1d';
-      default: return '2h';
+      case 'all': return 'All Time';
+      case '7200': return '2h';
+      case '14400': return '4h';
+      case '28800': return '8h';
+      case '86400': return '1d';
+      case '604800': return '7d';
+      case '2592000': return '30d';
+      default: return 'All Time';
     }
   };
 
@@ -136,13 +142,16 @@ const FraudPatterns = ({ transactions = [] }) => {
         <div className="flex items-center gap-3">
           <select
             value={timeframe}
-            onChange={(e) => setTimeframe(parseInt(e.target.value))}
+            onChange={(e) => setTimeframe(e.target.value)}
             className="text-sm font-semibold bg-gradient-to-r from-blue-50 to-cyan-50 border-2 border-blue-200 text-blue-700 rounded-xl px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all hover:shadow-md cursor-pointer"
           >
-            <option value="7200">2h</option>
-            <option value="14400">4h</option>
-            <option value="28800">8h</option>
-            <option value="86400">1d</option>
+            <option value="all">All Time</option>
+            <option value="7200">Last 2h</option>
+            <option value="14400">Last 4h</option>
+            <option value="28800">Last 8h</option>
+            <option value="86400">Last 24h</option>
+            <option value="604800">Last 7d</option>
+            <option value="2592000">Last 30d</option>
           </select>
         </div>
       </div>

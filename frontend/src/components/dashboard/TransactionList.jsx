@@ -70,7 +70,7 @@ const TransactionList = ({
     
     // Apply main filter (from props)
     if (filter === 'accepted') {
-      data = data.filter(t => t.status === 'completed');
+      data = data.filter(t => t.status === 'accepted');
     } else if (filter === 'blocked') {
       data = data.filter(t => t.status === 'blocked' || t.status === 'unknown');
     }
@@ -120,7 +120,7 @@ const TransactionList = ({
     if (filterStatuses.length > 0) {
       data = data.filter(t => {
         return filterStatuses.some(status => {
-          if (status === 'accepted' || !t.is_fraud ) return t.status === 'completed';
+          if (status === 'accepted' || !t.is_fraud ) return t.status === 'accepted';
           if (status === 'blocked' || is_fraud) return t.status === 'blocked';
           return false;
         });
@@ -193,6 +193,7 @@ const TransactionList = ({
 
   const getStatusBadge = (status) => {
     const statusMap = {
+      accepted: { variant: 'success', label: 'Accepted' },
       completed: { variant: 'success', label: 'Accepted' },
       blocked: { variant: 'danger', label: 'Blocked' },
     };

@@ -95,7 +95,7 @@ const Transactions = () => {
   }, [allTransactions]);
 
   const statusOptions = useMemo(() => {
-    const acceptedCount = allTransactions.filter(t => t.status === 'completed').length;
+    const acceptedCount = allTransactions.filter(t => t.status === 'accepted').length;
     const blockedCount = allTransactions.filter(t => t.status === 'blocked' || t.status === 'unknown').length;
     
     return [
@@ -144,21 +144,17 @@ const Transactions = () => {
       if (response.success && response.transactions) {
         console.log(`✅ Found ${response.transactions.length} transactions`);
         
-        // Transform backend data to frontend format
+        // Keep ALL original backend fields and add frontend helpers
         const formatted = response.transactions.map(tx => ({
-          ...tx,  // Keep all original backend fields FIRST
-          // Only add frontend-specific fields, don't override existing backend fields
+          ...tx,  // Keep ALL original backend fields
           id: tx.trans_num || tx.id,
-          ...(tx.merchant && { merchant: tx.merchant }),
-          ...(tx.amt !== undefined && tx.amt !== null && { amount: `$${tx.amt.toFixed(2)}` }),
-          ...(tx.status && { status: tx.status }),
-          ...(tx.risk_score !== undefined && { riskScore: tx.risk_score }),
-          ...(tx.trans_date && tx.trans_time && { date: `${tx.trans_date} ${tx.trans_time}` }),
-          ...(tx.category && { category: tx.category }),
-          ...(tx.first && tx.last && { customer: `${tx.first} ${tx.last}` }),
-          ...(tx.city && tx.state && { location: `${tx.city}, ${tx.state}` }),
-          ...(tx.cc_num && { method: `****${String(tx.cc_num).slice(-4)}` }),
-          isFraud: tx.is_fraud || tx.isFraud || tx.status === 'blocked' || tx.status === 'unknown'  // Consistent fraud detection
+          amount: tx.amt ? `$${tx.amt.toFixed(2)}` : '$0.00',
+          riskScore: tx.risk_score || 0,
+          date: tx.trans_date && tx.trans_time ? `${tx.trans_date} ${tx.trans_time}` : tx.created_at,
+          customer: tx.first && tx.last ? `${tx.first} ${tx.last}` : '',
+          location: tx.city && tx.state ? `${tx.city}, ${tx.state}` : '',
+          method: tx.cc_num ? `****${String(tx.cc_num).slice(-4)}` : 'Unknown',
+          isFraud: tx.is_fraud || tx.isFraud || tx.status === 'blocked' || tx.status === 'unknown'
         }));
         
         console.log('✨ Formatted transactions:', formatted);
@@ -166,7 +162,7 @@ const Transactions = () => {
         
         // Calculate stats
         const total = formatted.length;
-        const accepted = formatted.filter(t => t.status === 'completed').length;
+        const accepted = formatted.filter(t => t.status === 'accepted').length;
         const blocked = formatted.filter(t => t.status === 'blocked' || t.status === 'unknown').length;
         
         console.log('📊 Stats:', { total, accepted, blocked });

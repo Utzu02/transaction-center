@@ -1,17 +1,22 @@
 import { useState } from 'react';
-import { Save, Plus, DollarSign, User, MapPin, Calendar, CreditCard, Building, Bell, Send } from 'lucide-react';
+import { Save, Plus, DollarSign, User, MapPin, Calendar, CreditCard, Building, Bell, Send, Trash2, AlertTriangle } from 'lucide-react';
 import { useToast } from '../components/common/ToastContainer';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
 import LiveMonitorControl from '../components/dashboard/LiveMonitorControl';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import apiService from '../services/api';
 
 const Settings = () => {
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmittingNotif, setIsSubmittingNotif] = useState(false);
+  const [deleteTransactionsConfirm, setDeleteTransactionsConfirm] = useState(false);
+  const [deleteNotificationsConfirm, setDeleteNotificationsConfirm] = useState(false);
+  const [isDeletingTransactions, setIsDeletingTransactions] = useState(false);
+  const [isDeletingNotifications, setIsDeletingNotifications] = useState(false);
 
   // Notification debugger state
   const [notifForm, setNotifForm] = useState({
@@ -30,7 +35,7 @@ const Settings = () => {
     
     // Optional transaction details
     category: 'grocery_pos',
-    status: 'completed',
+    status: 'accepted',
     is_fraud: false,
     risk_score: 0,
     
@@ -184,7 +189,7 @@ const Settings = () => {
           amt: '',
           merchant: '',
           category: 'grocery_pos',
-          status: 'completed',
+          status: 'accepted',
           is_fraud: false,
           risk_score: 0,
           trans_date: new Date().toISOString().split('T')[0],
@@ -206,6 +211,42 @@ const Settings = () => {
     }
   };
 
+  const handleDeleteAllTransactions = async () => {
+    setIsDeletingTransactions(true);
+    try {
+      const response = await apiService.deleteAllTransactions();
+      if (response.success) {
+        toast.showSuccess(`✅ Deleted ${response.deleted_count || 'all'} transactions`, 3000);
+        setDeleteTransactionsConfirm(false);
+      } else {
+        toast.showError('Failed to delete transactions', 3000);
+      }
+    } catch (error) {
+      console.error('Error deleting transactions:', error);
+      toast.showError('Failed to delete transactions', 3000);
+    } finally {
+      setIsDeletingTransactions(false);
+    }
+  };
+
+  const handleDeleteAllNotifications = async () => {
+    setIsDeletingNotifications(true);
+    try {
+      const response = await apiService.deleteAllNotifications();
+      if (response.success) {
+        toast.showSuccess(`✅ Deleted ${response.deleted_count || 'all'} notifications`, 3000);
+        setDeleteNotificationsConfirm(false);
+      } else {
+        toast.showError('Failed to delete notifications', 3000);
+      }
+    } catch (error) {
+      console.error('Error deleting notifications:', error);
+      toast.showError('Failed to delete notifications', 3000);
+    } finally {
+      setIsDeletingNotifications(false);
+    }
+  };
+
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-50">
       <Sidebar />
@@ -224,6 +265,66 @@ const Settings = () => {
             <div className="mb-8">
               <h2 className="text-xl font-bold text-gray-900 mb-4">Live Data Stream Configuration</h2>
               <LiveMonitorControl onChange={handleConfigChange} />
+            </div>
+
+            {/* Danger Zone - Delete All Data */}
+            <div className="mb-8">
+              <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+                Danger Zone
+              </h2>
+              
+              <Card className="border-2 border-red-200 bg-red-50">
+                <div className="space-y-4">
+                  <div className="bg-red-100 border border-red-300 rounded-lg p-4">
+                    <p className="text-sm text-red-800">
+                      <strong>⚠️ Warning:</strong> These actions are irreversible. All data will be permanently deleted.
+                    </p>
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    {/* Delete All Transactions */}
+                    <div className="bg-white rounded-lg p-4 border border-red-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <Trash2 className="w-5 h-5 text-red-600" />
+                        Delete All Transactions
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        This will permanently delete all transactions from the database.
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => setDeleteTransactionsConfirm(true)}
+                        disabled={isDeletingTransactions}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        {isDeletingTransactions ? 'Deleting...' : 'Delete All Transactions'}
+                      </Button>
+                    </div>
+
+                    {/* Delete All Notifications */}
+                    <div className="bg-white rounded-lg p-4 border border-red-200">
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+                        <Bell className="w-5 h-5 text-red-600" />
+                        Delete All Notifications
+                      </h3>
+                      <p className="text-sm text-gray-600 mb-4">
+                        This will permanently delete all notifications from the database.
+                      </p>
+                      <Button
+                        type="button"
+                        onClick={() => setDeleteNotificationsConfirm(true)}
+                        disabled={isDeletingNotifications}
+                        className="w-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2"
+                      >
+                        <Bell className="w-4 h-4" />
+                        {isDeletingNotifications ? 'Deleting...' : 'Delete All Notifications'}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
             </div>
 
             {/* Notification Debugger Section */}
@@ -750,7 +851,7 @@ const Settings = () => {
                       variant="outline"
                       onClick={() => setFormData({
                         trans_num: '', amt: '', merchant: '', category: 'grocery_pos',
-                        status: 'completed', is_fraud: false, risk_score: 0,
+                        status: 'accepted', is_fraud: false, risk_score: 0,
                         trans_date: new Date().toISOString().split('T')[0],
                         trans_time: new Date().toTimeString().split(' ')[0],
                         unix_time: Math.floor(Date.now() / 1000),
@@ -778,6 +879,27 @@ const Settings = () => {
           </div>
         </main>
       </div>
+
+      {/* Confirm Dialogs */}
+      <ConfirmDialog
+        isOpen={deleteTransactionsConfirm}
+        onClose={() => setDeleteTransactionsConfirm(false)}
+        onConfirm={handleDeleteAllTransactions}
+        title="Delete All Transactions?"
+        message="Are you sure you want to delete ALL transactions? This action cannot be undone and will permanently remove all transaction data from the database."
+        confirmText="Delete All"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        isOpen={deleteNotificationsConfirm}
+        onClose={() => setDeleteNotificationsConfirm(false)}
+        onConfirm={handleDeleteAllNotifications}
+        title="Delete All Notifications?"
+        message="Are you sure you want to delete ALL notifications? This action cannot be undone and will permanently remove all notification data from the database."
+        confirmText="Delete All"
+        variant="danger"
+      />
     </div>
   );
 };

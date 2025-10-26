@@ -31,7 +31,7 @@ STREAM_URL = os.getenv('STREAM_URL', 'https://95.217.75.14:8443/stream')
 HACKATHON_API_KEY = os.getenv('HACKATHON_API_KEY', '')
 
 # Backend configuration (where to send processed transactions)
-BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:5000')
+BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:5050')
 BACKEND_PROCESS_URL = f"{BACKEND_URL}/api/transactions/process"
 
 MODEL_PATH = os.getenv('MODEL_PATH', 'fraud_detector_model.pkl')
@@ -63,7 +63,7 @@ lock = threading.Lock()
 # 0.15 = 15% fraud (balanced)
 # 0.25 = 25% fraud (mai mult) ← PENTRU MAI MULT FRAUD
 # 0.35 = 35% fraud (foarte mult)
-TARGET_FRAUD_RATE = 0.30  # ← CRESCUT pentru mai mult fraud detectat!
+TARGET_FRAUD_RATE = 0.465  # ← CRESCUT pentru mai mult fraud detectat!
 
 # Minim confidence pentru a flaga (0-1)
 # 0.0 = TOATE tranzacțiile (maxim fraud detectat)
@@ -203,14 +203,49 @@ def process_transaction(transaction):
         # Calculate processing time
         processing_time = time.time() - start_time
         
+        # Calculate distance between customer and merchant (if coordinates available)
+        from math import radians, cos, sin, asin, sqrt
+        distance = None
+        if trans_data['lat'] and trans_data['long'] and trans_data['merch_lat'] and trans_data['merch_long']:
+            try:
+                # Haversine formula for distance in km
+                lat1, lon1 = radians(trans_data['lat']), radians(trans_data['long'])
+                lat2, lon2 = radians(trans_data['merch_lat']), radians(trans_data['merch_long'])
+                dlat = lat2 - lat1
+                dlon = lon2 - lon1
+                a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+                c = 2 * asin(sqrt(a))
+                distance = 6371 * c  # Earth radius in km
+            except:
+                pass
+        
+        # Determine fraud pattern based on category and conditions
+        pattern = None
+        if is_fraud:
+            if distance and distance > 100:
+                pattern = f"Unusual distance ({distance:.0f}km from home)"
+            elif trans_data['amt'] > 500:
+                pattern = "High-value transaction"
+            elif trans_data['category'] in ['gas_transport', 'shopping_net']:
+                pattern = f"Suspicious {trans_data['category']} activity"
+            else:
+                pattern = "Anomalous behavior pattern"
+        
         # Prepare data to send to backend
         backend_data = {
             **trans_data,  # Include all transaction fields
             'is_fraud': bool(is_fraud),
+            'isFraud': bool(is_fraud),  # Add both for frontend consistency
             'fraud_probability': float(probability),
             'confidence': float(confidence),
             'processing_time': float(processing_time),
-            'status': 'flagged' if is_fraud else 'cleared'
+            'distance': float(distance) if distance else None,
+            'pattern': pattern,
+            # Risk score based on fraud probability (0-100 scale)
+            # For fraud: use confidence (how sure we are) * 100
+            # For non-fraud: use probability (how close to fraud threshold) * 100
+            'risk_score': int(confidence * 100) if is_fraud else int(probability * 100),
+            'status': 'blocked' if is_fraud else 'accepted'  # Match backend status values
         }
         
         # Send to backend

@@ -81,6 +81,7 @@ def delete_notification(notification_id):
     return jsonify(result), 200
 
 @notification_bp.route('/all', methods=['DELETE'])
+@notification_bp.route('/delete-all', methods=['DELETE'])
 def delete_all_notifications():
     """Delete all notifications"""
     result = NotificationService.delete_all_notifications()
