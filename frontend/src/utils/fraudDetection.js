@@ -144,6 +144,16 @@ export const getAgeSegment = (dob) => {
  * Format transaction for display
  */
 export const formatTransaction = (transaction) => {
+  // Use backend fraud detection if available, otherwise calculate locally
+  // Consistent fraud detection: check is_fraud, isFraud, status === 'blocked' or 'unknown', OR calculate locally
+  const isFraud = transaction.is_fraud !== undefined 
+    ? transaction.is_fraud 
+    : transaction.isFraud !== undefined 
+    ? transaction.isFraud 
+    : transaction.status === 'blocked' || transaction.status === 'unknown'
+    ? true
+    : isFraudulent(transaction);
+  
   return {
     id: transaction.trans_num,
     customer: `${transaction.first} ${transaction.last}`,
@@ -152,14 +162,15 @@ export const formatTransaction = (transaction) => {
     category: transaction.category,
     location: `${transaction.city}, ${transaction.state}`,
     timestamp: transaction.unix_time,
-    riskScore: calculateRiskScore(transaction),
-    isFraud: isFraudulent(transaction),
-    pattern: classifyFraudPattern(transaction),
+    riskScore: transaction.risk_score || calculateRiskScore(transaction),
+    isFraud: isFraud,
+    is_fraud: isFraud, // Add both for consistency
+    pattern: transaction.pattern || classifyFraudPattern(transaction),
     ageSegment: getAgeSegment(transaction.dob),
     age: calculateAge(transaction.dob),
-    distance: transaction.lat && transaction.merch_lat 
+    distance: transaction.distance || (transaction.lat && transaction.merch_lat 
       ? calculateDistance(transaction.lat, transaction.long, transaction.merch_lat, transaction.merch_long)
-      : null,
+      : null),
     raw: transaction
   };
 };

@@ -3,6 +3,10 @@ let eventSource = null;
 const subscribers = {};
 
 const sseService = {
+  isConnected: () => {
+    return eventSource !== null;
+  },
+
   connect: (streamUrl, apiKey) => {
     if (eventSource && eventSource.readyState === EventSource.OPEN) {
       console.log('SSE already connected.');

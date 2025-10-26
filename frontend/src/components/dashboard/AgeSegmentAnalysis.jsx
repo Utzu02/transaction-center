@@ -16,8 +16,8 @@ const AgeSegmentAnalysis = ({ transactions = [] }) => {
     // Calculate age segments from fraud transactions
     const fraudTransactions = transactions.filter(t => {
       const isFraudValue = t.isFraud || t.is_fraud;
-      // Handle various fraud flag formats (boolean, string, number)
-      return isFraudValue === true || isFraudValue === 1 || isFraudValue === '1' || isFraudValue === 'true';
+      // Consistent fraud detection: check is_fraud, isFraud, status === 'blocked' or 'unknown'
+      return isFraudValue === true || isFraudValue === 1 || isFraudValue === '1' || isFraudValue === 'true' || t.status === 'blocked' || t.status === 'unknown';
     });
     
     console.log(`📊 Found ${fraudTransactions.length} fraud transactions`);

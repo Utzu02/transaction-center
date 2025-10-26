@@ -19,7 +19,8 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
   }, [transactions, autoScroll]);
 
   const getStatusColor = (transaction) => {
-    if (transaction.isFraud || transaction.is_fraud) return 'danger';
+    // Consistent fraud detection: check is_fraud, isFraud, OR status === 'blocked' or 'unknown'
+    if (transaction.isFraud || transaction.is_fraud || transaction.status === 'blocked' || transaction.status === 'unknown') return 'danger';
     if ((transaction.riskScore || 0) > 60) return 'warning';
     return 'success';
   };
@@ -89,7 +90,7 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
             <div
               key={`${transaction.id}-${index}`}
               className={`p-4 rounded-lg border-2 transition-all duration-300 ${
-                (transaction.isFraud || transaction.is_fraud)
+                (transaction.isFraud || transaction.is_fraud || transaction.status === 'blocked' || transaction.status === 'unknown')
                   ? 'border-red-300 bg-red-50'
                   : (transaction.riskScore || 0) > 60
                   ? 'border-yellow-300 bg-yellow-50'
@@ -99,7 +100,7 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    {(transaction.isFraud || transaction.is_fraud) ? (
+                    {(transaction.isFraud || transaction.is_fraud || transaction.status === 'blocked' || transaction.status === 'unknown') ? (
                       <AlertTriangle className="w-5 h-5 text-red-600" />
                     ) : (
                       <CheckCircle className="w-5 h-5 text-green-600" />
@@ -108,7 +109,7 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
                       ${(transaction.amount || transaction.amt || 0).toFixed(2)}
                     </span>
                     <Badge variant={getStatusColor(transaction)}>
-                      {(transaction.isFraud || transaction.is_fraud) ? 'FRAUD' : getRiskLevel(transaction.riskScore || 0)}
+                      {(transaction.isFraud || transaction.is_fraud || transaction.status === 'blocked' || transaction.status === 'unknown') ? 'FRAUD' : getRiskLevel(transaction.riskScore || 0)}
                     </Badge>
                     <span className="text-xs text-gray-500">
                       {formatTimestamp(transaction.timestamp || transaction.unix_time || transaction.created_at)}
@@ -129,7 +130,7 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
                     </div>
                   </div>
 
-                  {(transaction.isFraud || transaction.is_fraud) && (
+                  {(transaction.isFraud || transaction.is_fraud || transaction.status === 'blocked' || transaction.status === 'unknown') && (
                     <div className="mt-2 p-2 bg-red-100 rounded text-xs text-red-800">
                       <strong>Pattern:</strong> {transaction.pattern || 'Suspicious Activity'}
                     </div>
@@ -151,10 +152,10 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
                   
                   <button
                     onClick={() => setPreviewTransaction(transaction)}
-                    className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-blue-50 hover:border-blue-400 transition-colors"
+                    className="group p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                     title="Quick Preview"
                   >
-                    <Eye className="w-4 h-4 text-gray-600" />
+                    <Eye className="w-4 h-4 text-white" />
                   </button>
                 </div>
               </div>

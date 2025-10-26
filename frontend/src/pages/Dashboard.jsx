@@ -43,23 +43,25 @@ const Dashboard = () => {
     setIsLoadingTransactions(true);
     try {
       console.log('📊 Fetching transactions from database...');
-      const response = await apiService.getTransactions({ limit: 100, sort_order: -1 });
+      const response = await apiService.getTransactions({ limit: 1000, sort_order: -1 });
       
       if (response.success && response.transactions) {
         console.log(`✅ Loaded ${response.transactions.length} transactions from database`);
         
         // Transform backend data to frontend format
         const formatted = response.transactions.map(tx => ({
+          ...tx,  // Keep all original backend fields FIRST
+          // Only add frontend-specific fields, don't override existing backend fields
           id: tx.trans_num || tx.id,
-          merchant: tx.merchant || 'Unknown',
-          amount: tx.amt || 0,
-          status: tx.status || 'completed',
-          riskScore: tx.risk_score || 0,
-          timestamp: tx.unix_time || Math.floor(new Date(tx.created_at).getTime() / 1000),
-          category: tx.category || 'Unknown',
-          customer: tx.first && tx.last ? `${tx.first} ${tx.last}` : 'Unknown',
-          location: tx.city && tx.state ? `${tx.city}, ${tx.state}` : 'Unknown',
-          isFraud: tx.is_fraud || false
+          ...(tx.amt !== undefined && tx.amt !== null && { amount: tx.amt }),  // Only set amount if amt exists
+          ...(tx.merchant && { merchant: tx.merchant }),
+          ...(tx.status && { status: tx.status }),
+          ...(tx.risk_score !== undefined && { riskScore: tx.risk_score }),
+          ...(tx.unix_time && { timestamp: tx.unix_time }),
+          ...(tx.category && { category: tx.category }),
+          ...(tx.first && tx.last && { customer: `${tx.first} ${tx.last}` }),
+          ...(tx.city && tx.state && { location: `${tx.city}, ${tx.state}` }),
+          isFraud: tx.is_fraud || tx.isFraud || tx.status === 'blocked' || tx.status === 'unknown'  // Consistent fraud detection
         }));
         
         setDbTransactions(formatted);
@@ -174,7 +176,7 @@ const Dashboard = () => {
           await apiService.createTransaction(transaction);
           console.log(`✅ Saved transaction ${transaction.trans_num || transaction.id} to database`);
           // Refresh DB transactions after save
-          fetchTransactions();
+          fetchDatabaseTransactions();
         } catch (error) {
           console.error('❌ Failed to save transaction to database:', error);
         }
@@ -467,14 +469,16 @@ const Dashboard = () => {
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
               <AnalyticsCard
                 title="Total Transactions"
-                value={(dbTransactions.length + liveStats.processed).toLocaleString()}
+                value={dbTransactions.length.toLocaleString()}
                 icon={CreditCard}
                 color="primary"
-                tooltip="Total transactions from database and live stream."
+                tooltip="Total transactions stored in the database."
+                onViewAll={() => navigate('/transactions')}
+                viewAllText="View All"
               />
               <AnalyticsCard
                 title="Fraud Detected"
-                value={(dbTransactions.filter(t => t.isFraud).length + liveStats.fraudDetected).toLocaleString()}
+                value={dbTransactions.filter(t => t.isFraud).length.toLocaleString()}
                 icon={AlertTriangle}
                 color="danger"
                 tooltip="Fraudulent transactions flagged by AI/ML system based on risk patterns."
@@ -482,8 +486,8 @@ const Dashboard = () => {
               <AnalyticsCard
                 title="Detection Rate"
                 value={`${(() => {
-                  const totalTx = dbTransactions.length + liveStats.processed;
-                  const totalFraud = dbTransactions.filter(t => t.isFraud).length + liveStats.fraudDetected;
+                  const totalTx = dbTransactions.length;
+                  const totalFraud = dbTransactions.filter(t => t.isFraud).length;
                   return totalTx > 0 ? ((totalFraud / totalTx) * 100).toFixed(1) : "0";
                 })()}%`}
                 icon={TrendingUp}
@@ -518,8 +522,8 @@ const Dashboard = () => {
                   status: t.isFraud ? 'blocked' : 'completed',
                   date: t.timestamp ? new Date(t.timestamp * 1000).toISOString() : new Date().toISOString()
                 }))
-              ].sort((a, b) => new Date(b.date) - new Date(a.date))}
-              maxRows={10}
+              ].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 5)}
+              maxRows={5}
               showExport={true}
               showViewMore={true}
             />

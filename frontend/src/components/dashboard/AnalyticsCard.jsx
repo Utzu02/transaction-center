@@ -1,7 +1,7 @@
-import { Info } from 'lucide-react';
+import { Info, ArrowRight } from 'lucide-react';
 import Card from '../common/Card';
 
-const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip }) => {
+const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip, onViewAll, viewAllText = 'View All' }) => {
   const colorClasses = {
     primary: 'bg-gradient-to-br from-blue-100 to-cyan-100 text-blue-600',
     success: 'bg-gradient-to-br from-green-100 to-emerald-100 text-green-600',
@@ -12,7 +12,7 @@ const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip })
   return (
     <Card className="relative overflow-visible">
       <div className="flex items-start justify-between">
-        <div>
+        <div className="flex-1">
           <div className="flex items-center gap-2 mb-1">
             <p className="text-sm text-gray-600">{title}</p>
             {tooltip && (
@@ -39,6 +39,17 @@ const AnalyticsCard = ({ title, value, icon: Icon, color = 'primary', tooltip })
             )}
           </div>
           <h3 className="text-3xl font-bold text-gray-900">{value}</h3>
+          
+          {/* View All Button */}
+          {onViewAll && (
+            <button
+              onClick={onViewAll}
+              className="mt-3 flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors group"
+            >
+              {viewAllText}
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+            </button>
+          )}
         </div>
         <div className={`p-3 rounded-lg ${colorClasses[color]}`}>
           <Icon className="w-6 h-6" />

@@ -72,7 +72,7 @@ const TransactionList = ({
     if (filter === 'accepted') {
       data = data.filter(t => t.status === 'completed');
     } else if (filter === 'blocked') {
-      data = data.filter(t => t.status === 'blocked');
+      data = data.filter(t => t.status === 'blocked' || t.status === 'unknown');
     }
 
     // Apply advanced filters
@@ -120,8 +120,8 @@ const TransactionList = ({
     if (filterStatuses.length > 0) {
       data = data.filter(t => {
         return filterStatuses.some(status => {
-          if (status === 'accepted') return t.status === 'completed';
-          if (status === 'blocked') return t.status === 'blocked';
+          if (status === 'accepted' || !t.is_fraud ) return t.status === 'completed';
+          if (status === 'blocked' || is_fraud) return t.status === 'blocked';
           return false;
         });
       });
@@ -169,9 +169,9 @@ const TransactionList = ({
   // Limit rows for display
   const displayData = maxRows ? filteredData.slice(0, maxRows) : filteredData;
 
-  // Check if all displayed transactions are selected
-  const allSelected = displayData.length > 0 && displayData.every(t => selectedTransactions.has(t.id));
-  const someSelected = displayData.some(t => selectedTransactions.has(t.id)) && !allSelected;
+  // Check if all filtered transactions are selected (not just displayed)
+  const allSelected = filteredData.length > 0 && filteredData.every(t => selectedTransactions.has(t.id));
+  const someSelected = filteredData.some(t => selectedTransactions.has(t.id)) && !allSelected;
 
   const handleDeleteTransaction = async () => {
     const { transactionNum } = deleteConfirm;
@@ -256,12 +256,12 @@ const TransactionList = ({
     if (allSelected || someSelected) {
       // Deselect all (both when all selected or some selected for intuitive behavior)
       const newSelected = new Set(selectedTransactions);
-      displayData.forEach(t => newSelected.delete(t.id));
+      filteredData.forEach(t => newSelected.delete(t.id));
       setSelectedTransactions(newSelected);
     } else {
-      // Select all displayed (only when none are selected)
+      // Select all filtered transactions (from entire dataset, not just displayed)
       const newSelected = new Set(selectedTransactions);
-      displayData.forEach(t => newSelected.add(t.id));
+      filteredData.forEach(t => newSelected.add(t.id));
       setSelectedTransactions(newSelected);
     }
   };
@@ -356,7 +356,7 @@ const TransactionList = ({
                     />
                     <div className="absolute left-full ml-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
                       <div className="bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg">
-                        {allSelected ? "Deselect all" : someSelected ? `Deselect all (${selectedTransactions.size} selected)` : `Select all (${displayData.length})`}
+                        {allSelected ? "Deselect all" : someSelected ? `Deselect all (${selectedTransactions.size} selected)` : `Select all (${filteredData.length} total)`}
                       </div>
                     </div>
                   </div>
@@ -420,10 +420,10 @@ const TransactionList = ({
                     <div className="flex items-center gap-2">
                       <button 
                         onClick={() => setPreviewTransaction(transaction)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="group p-2.5 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 shadow-md hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                         title="Quick Preview"
                       >
-                        <Eye className="w-4 h-4" />
+                        <Eye className="w-4 h-4 text-white" />
                       </button>
                       <button 
                         onClick={() => setDeleteConfirm({ 

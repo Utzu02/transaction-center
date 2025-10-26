@@ -36,25 +36,31 @@ const Analytics = () => {
           setDbTransactions(response.transactions);
           
           // Calculate risk distribution based on real data
-          const fraudCount = response.transactions.filter(t => t.is_fraud || t.isFraud).length;
+          // Consistent fraud detection: check is_fraud, isFraud, OR status === 'blocked' or 'unknown'
+          const fraudCount = response.transactions.filter(t => 
+            t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown'
+          ).length;
           const legitimateCount = response.transactions.length - fraudCount;
           
           // Categorize by fraud probability or status
           const highRisk = response.transactions.filter(t => 
-            (t.is_fraud || t.isFraud) && (t.fraud_probability > 0.7 || t.confidence > 0.7)
+            (t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown') && (t.fraud_probability > 0.7 || t.confidence > 0.7)
           ).length;
           
           const mediumRisk = response.transactions.filter(t => 
-            (t.is_fraud || t.isFraud) && (t.fraud_probability <= 0.7 && t.fraud_probability > 0.4)
+            (t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown') && (t.fraud_probability <= 0.7 && t.fraud_probability > 0.4)
           ).length;
           
           const lowRisk = legitimateCount;
           
-          setRiskDistribution([
-            { risk: 'Legitimate', count: lowRisk, color: '#22c55e' },
-            { risk: 'Medium Risk', count: mediumRisk, color: '#f59e0b' },
-            { risk: 'High Risk', count: highRisk, color: '#ef4444' },
-          ]);
+          // Only include categories with data
+          const distribution = [
+            { name: 'Legitimate', value: lowRisk, count: lowRisk, color: '#22c55e' },
+            { name: 'Medium Risk', value: mediumRisk, count: mediumRisk, color: '#f59e0b' },
+            { name: 'High Risk', value: highRisk, count: highRisk, color: '#ef4444' },
+          ].filter(item => item.count > 0); // Only show categories with transactions
+          
+          setRiskDistribution(distribution);
         }
       } catch (error) {
         console.error('Error fetching transactions:', error);
@@ -171,14 +177,14 @@ const Analytics = () => {
     },
     {
       title: 'Fraud Detected',
-      value: (dbTransactions.filter(t => t.is_fraud || t.isFraud).length + liveStats.fraudDetected).toLocaleString(),
+      value: (dbTransactions.filter(t => t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown').length + liveStats.fraudDetected).toLocaleString(),
       icon: Shield,
       color: 'warning'
     },
     {
       title: 'Fraud Rate',
       value: dbTransactions.length > 0
-        ? `${((dbTransactions.filter(t => t.is_fraud || t.isFraud).length / dbTransactions.length) * 100).toFixed(1)}%`
+        ? `${((dbTransactions.filter(t => t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown').length / dbTransactions.length) * 100).toFixed(1)}%`
         : '0%',
       icon: Activity,
       color: 'danger'
@@ -250,7 +256,7 @@ const Analytics = () => {
                         Transaction Trends
                       </h3>
                       <p className="text-xs text-gray-600">
-                        {isLoading ? 'Loading...' : `Last ${monthlyData.length} months`}
+                        {isLoading ? 'Loading...' : monthlyData.length > 0 ? `Last ${monthlyData.length} month${monthlyData.length > 1 ? 's' : ''}` : 'No data yet'}
                       </p>
                     </div>
                   </div>
@@ -313,7 +319,7 @@ const Analytics = () => {
                         Risk Distribution
                       </h3>
                       <p className="text-xs text-gray-600">
-                        {isLoading ? 'Loading...' : `Based on ${dbTransactions.length} transactions`}
+                        {isLoading ? 'Loading...' : dbTransactions.length === 0 ? 'No data yet' : `Based on ${dbTransactions.length} transaction${dbTransactions.length > 1 ? 's' : ''}`}
                       </p>
                     </div>
                   </div>
@@ -328,11 +334,15 @@ const Analytics = () => {
                           data={riskDistribution}
                           cx="50%"
                           cy="50%"
-                          labelLine={false}
-                          label={({ risk, count, percent }) => `${risk}: ${count} (${(percent * 100).toFixed(1)}%)`}
+                          labelLine={true}
+                          label={({ name, count, percent }) => {
+                            // Only show label if percentage is > 5%
+                            if (percent < 0.05) return '';
+                            return `${name}\n${count} (${(percent * 100).toFixed(1)}%)`;
+                          }}
                           outerRadius={100}
                           fill="#8884d8"
-                          dataKey="count"
+                          dataKey="value"
                           isAnimationActive={false}
                         >
                           {riskDistribution.map((entry, index) => (
@@ -346,11 +356,19 @@ const Analytics = () => {
                             borderRadius: '12px',
                             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                           }}
+                          formatter={(value, name, props) => [
+                            `${value} transactions (${((value / riskDistribution.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1)}%)`,
+                            props.payload.name
+                          ]}
                         />
                         <Legend 
                           verticalAlign="bottom" 
                           height={36}
-                          formatter={(value, entry) => `${value}: ${entry.payload.count}`}
+                          formatter={(value, entry) => {
+                            const item = entry.payload;
+                            return `${item.name}: ${item.count}`;
+                          }}
+                          iconType="circle"
                         />
                       </PieChart>
                     </ResponsiveContainer>

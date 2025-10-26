@@ -6,6 +6,20 @@ class ApiService {
     this.baseUrl = API_BASE_URL;
   }
 
+  // Helper to normalize transaction data
+  normalizeTransaction(transaction) {
+    if (!transaction) return transaction;
+    
+    // Ensure isFraud property exists for frontend consistency
+    if (transaction.is_fraud !== undefined && transaction.isFraud === undefined) {
+      transaction.isFraud = transaction.is_fraud;
+    } else if (transaction.isFraud === undefined) {
+      transaction.isFraud = false;
+    }
+    
+    return transaction;
+  }
+
   // Helper method for API calls
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
@@ -39,7 +53,14 @@ class ApiService {
    */
   async getTransactions(filters = {}) {
     const params = new URLSearchParams(filters);
-    return this.request(`/api/transactions?${params}`);
+    const response = await this.request(`/api/transactions?${params}`);
+    
+    // Normalize transactions to include isFraud property
+    if (response.success && response.transactions) {
+      response.transactions = response.transactions.map(t => this.normalizeTransaction(t));
+    }
+    
+    return response;
   }
 
   /**
@@ -47,7 +68,8 @@ class ApiService {
    * @param {string} id - Transaction ID
    */
   async getTransaction(id) {
-    return this.request(`/api/transactions/${id}`);
+    const transaction = await this.request(`/api/transactions/${id}`);
+    return this.normalizeTransaction(transaction);
   }
 
   /**
@@ -66,7 +88,14 @@ class ApiService {
    * @param {number} limit - Number of transactions to fetch
    */
   async getRecentTransactions(limit = 10) {
-    return this.request(`/api/transactions/recent?limit=${limit}`);
+    const response = await this.request(`/api/transactions/recent?limit=${limit}`);
+    
+    // Normalize transactions to include isFraud property
+    if (response.success && response.transactions) {
+      response.transactions = response.transactions.map(t => this.normalizeTransaction(t));
+    }
+    
+    return response;
   }
 
   /**
@@ -75,7 +104,14 @@ class ApiService {
    * @param {number} limit - Number of transactions
    */
   async getTransactionsByStatus(status, limit = 100) {
-    return this.request(`/api/transactions?status=${status}&limit=${limit}`);
+    const response = await this.request(`/api/transactions?status=${status}&limit=${limit}`);
+    
+    // Normalize transactions to include isFraud property
+    if (response.success && response.transactions) {
+      response.transactions = response.transactions.map(t => this.normalizeTransaction(t));
+    }
+    
+    return response;
   }
 
   /**

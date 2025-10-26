@@ -14,7 +14,8 @@ const AlertsTimeline = ({ transactions = [] }) => {
     
     // Filter fraud transactions from last 2 hours
     const fraudTransactions = transactions.filter(t => {
-      const isFraud = t.isFraud || t.is_fraud;
+      // Consistent fraud detection: check is_fraud, isFraud, OR status === 'blocked' or 'unknown'
+      const isFraud = t.isFraud || t.is_fraud || t.status === 'blocked' || t.status === 'unknown';
       if (!isFraud) return false;
       
       // Get transaction time in milliseconds

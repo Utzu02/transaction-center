@@ -96,7 +96,7 @@ const Transactions = () => {
 
   const statusOptions = useMemo(() => {
     const acceptedCount = allTransactions.filter(t => t.status === 'completed').length;
-    const blockedCount = allTransactions.filter(t => t.status === 'blocked').length;
+    const blockedCount = allTransactions.filter(t => t.status === 'blocked' || t.status === 'unknown').length;
     
     return [
       { label: 'Accepted', value: 'accepted', count: acceptedCount },
@@ -146,16 +146,19 @@ const Transactions = () => {
         
         // Transform backend data to frontend format
         const formatted = response.transactions.map(tx => ({
+          ...tx,  // Keep all original backend fields FIRST
+          // Only add frontend-specific fields, don't override existing backend fields
           id: tx.trans_num || tx.id,
-          merchant: tx.merchant || 'Unknown',
-          amount: tx.amt ? `$${tx.amt.toFixed(2)}` : '$0.00',
-          status: tx.status || 'completed',
-          riskScore: tx.risk_score || 0,
-          date: tx.trans_date && tx.trans_time ? `${tx.trans_date} ${tx.trans_time}` : tx.created_at,
-          category: tx.category || 'Unknown',
-          customer: tx.first && tx.last ? `${tx.first} ${tx.last}` : (tx.customer || 'Unknown'),
-          location: tx.city && tx.state ? `${tx.city}, ${tx.state}` : (tx.location || 'Unknown'),
-          method: tx.cc_num ? `****${String(tx.cc_num).slice(-4)}` : 'Unknown'
+          ...(tx.merchant && { merchant: tx.merchant }),
+          ...(tx.amt !== undefined && tx.amt !== null && { amount: `$${tx.amt.toFixed(2)}` }),
+          ...(tx.status && { status: tx.status }),
+          ...(tx.risk_score !== undefined && { riskScore: tx.risk_score }),
+          ...(tx.trans_date && tx.trans_time && { date: `${tx.trans_date} ${tx.trans_time}` }),
+          ...(tx.category && { category: tx.category }),
+          ...(tx.first && tx.last && { customer: `${tx.first} ${tx.last}` }),
+          ...(tx.city && tx.state && { location: `${tx.city}, ${tx.state}` }),
+          ...(tx.cc_num && { method: `****${String(tx.cc_num).slice(-4)}` }),
+          isFraud: tx.is_fraud || tx.isFraud || tx.status === 'blocked' || tx.status === 'unknown'  // Consistent fraud detection
         }));
         
         console.log('✨ Formatted transactions:', formatted);
@@ -164,7 +167,7 @@ const Transactions = () => {
         // Calculate stats
         const total = formatted.length;
         const accepted = formatted.filter(t => t.status === 'completed').length;
-        const blocked = formatted.filter(t => t.status === 'blocked').length;
+        const blocked = formatted.filter(t => t.status === 'blocked' || t.status === 'unknown').length;
         
         console.log('📊 Stats:', { total, accepted, blocked });
         setStats({ total, accepted, blocked });
