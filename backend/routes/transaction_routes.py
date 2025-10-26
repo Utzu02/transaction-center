@@ -118,3 +118,19 @@ def get_recent_transactions():
     
     return jsonify(result), 200
 
+@transaction_bp.route('/process', methods=['POST'])
+def process_transaction():
+    """Process a transaction from live stream and save to database"""
+    data = request.get_json()
+    
+    if not data:
+        return jsonify({'error': 'No data provided'}), 400
+    
+    # Add transaction with fraud detection results
+    result = TransactionService.add_transaction(data)
+    
+    if not result['success']:
+        return jsonify({'error': result['error']}), 400
+    
+    return jsonify(result), 201
+

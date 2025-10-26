@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-HACKATHON LIVE - Real-time Fraud Detection with SSE Stream
+LIVE FRAUD DETECTION - Real-time processing and sending to frontend
 Integrates trained fraud detector with live transaction stream.
 NOW WITH ADAPTIVE THRESHOLD - mai fin și mai precis! 🎯
 """
@@ -17,16 +17,24 @@ import pandas as pd
 import numpy as np
 from collections import deque
 import sys
+import os
+from dotenv import load_dotenv
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+load_dotenv()
 
 # ============================================================================
 # CONFIGURATION - UPDATE THESE!
 # ============================================================================
-API_KEY = "a1f735db97adb19d1a0f675dabe9f7aab8148ff6731a903fb6d1aeddac56fc82"  # ← PUT YOUR API KEY HERE!
-STREAM_URL = "https://95.217.75.14:8443/stream"
-FLAG_URL = "https://95.217.75.14:8443/api/flag"
-MODEL_PATH = "fraud_detector_model.pkl"  # Your trained model
+# Stream configuration (optional - if you have a stream)
+STREAM_URL = os.getenv('STREAM_URL', 'https://95.217.75.14:8443/stream')
+HACKATHON_API_KEY = os.getenv('HACKATHON_API_KEY', '')
+
+# Backend configuration (where to send processed transactions)
+BACKEND_URL = os.getenv('BACKEND_URL', 'http://localhost:5000')
+BACKEND_PROCESS_URL = f"{BACKEND_URL}/api/transactions/process"
+
+MODEL_PATH = os.getenv('MODEL_PATH', 'fraud_detector_model.pkl')
 
 # ============================================================================
 # GLOBAL STATE
@@ -67,7 +75,8 @@ MIN_CONFIDENCE = 0.5  # ← Acceptă tranzacții cu confidence >= 0.15
 # ============================================================================
 # SETUP
 # ============================================================================
-headers = {"X-API-Key": API_KEY}
+stream_headers = {"X-API-Key": HACKATHON_API_KEY} if HACKATHON_API_KEY else {}
+backend_headers = {"Content-Type": "application/json"}
 
 def load_fraud_detector():
     """Load the trained fraud detection model with ADAPTIVE threshold."""
@@ -110,35 +119,35 @@ def load_fraud_detector():
         print(f"   Make sure '{MODEL_PATH}' exists!")
         return False
 
-def flag_transaction(trans_num, flag_value):
+def send_to_backend(transaction_data):
     """
-    Flag a transaction as fraud (1) or legitimate (0)
+    Send processed transaction to backend API
     
     Args:
-        trans_num: Transaction number from the stream
-        flag_value: 0 for legitimate, 1 for fraud
+        transaction_data: Dictionary with transaction data and fraud detection results
         
     Returns:
-        Response from the flag endpoint or None on error
+        Response from the backend or None on error
     """
     try:
-        payload = {
-            "trans_num": trans_num,
-            "flag_value": flag_value
-        }
-        response = requests.post(FLAG_URL, headers=headers, json=payload, verify=False, timeout=10)
+        response = requests.post(
+            BACKEND_PROCESS_URL, 
+            headers=backend_headers, 
+            json=transaction_data, 
+            timeout=10
+        )
         response.raise_for_status()
         return response.json()
     except requests.exceptions.Timeout:
-        print(f"⏱️  Timeout while flagging transaction {trans_num}")
+        print(f"⏱️  Timeout while sending to backend")
         with lock:
             stats['timeouts'] += 1
         return None
     except requests.exceptions.RequestException as e:
-        print(f"❌ Error flagging transaction {trans_num}: {e}")
+        print(f"❌ Error sending to backend: {e}")
         return None
     except json.JSONDecodeError as e:
-        print(f"❌ Error parsing response for transaction {trans_num}: {e}")
+        print(f"❌ Error parsing backend response: {e}")
         return None
 
 def process_transaction(transaction):
@@ -194,8 +203,18 @@ def process_transaction(transaction):
         # Calculate processing time
         processing_time = time.time() - start_time
         
-        # Submit the flag
-        result = flag_transaction(trans_num, is_fraud)
+        # Prepare data to send to backend
+        backend_data = {
+            **trans_data,  # Include all transaction fields
+            'is_fraud': bool(is_fraud),
+            'fraud_probability': float(probability),
+            'confidence': float(confidence),
+            'processing_time': float(processing_time),
+            'status': 'flagged' if is_fraud else 'cleared'
+        }
+        
+        # Send to backend
+        result = send_to_backend(backend_data)
         
         # Update statistics
         with lock:
@@ -249,14 +268,10 @@ def process_transaction(transaction):
         
     except Exception as e:
         print(f"❌ Error processing transaction {trans_num}: {e}")
+        import traceback
+        traceback.print_exc()
         with lock:
             stats['errors'] += 1
-        
-        # Try to flag as legitimate (0) if processing fails
-        try:
-            flag_transaction(trans_num, 0)
-        except:
-            pass
 
 def print_statistics():
     """Print current statistics with ADAPTIVE info."""
@@ -316,15 +331,9 @@ def statistics_thread():
 def main():
     """Main entry point."""
     print("="*80)
-    print(" "*20 + "HACKATHON LIVE FRAUD DETECTION")
+    print(" "*20 + "LIVE FRAUD DETECTION")
     print("="*80)
     print()
-    
-    # Check API key
-    if API_KEY == "YOUR_API_KEY":
-        print("❌ ERROR: Please set your API_KEY in the script!")
-        print("   Update the API_KEY variable at the top of the file.")
-        sys.exit(1)
     
     # Load model
     if not load_fraud_detector():
@@ -333,10 +342,11 @@ def main():
     
     print()
     print("🌐 Configuration:")
-    print(f"  Stream URL: {STREAM_URL}")
-    print(f"  Flag URL:   {FLAG_URL}")
-    print(f"  Model:      {MODEL_PATH}")
-    print(f"  API Key:    {API_KEY[:8]}...")
+    print(f"  Stream URL:  {STREAM_URL}")
+    print(f"  Backend URL: {BACKEND_PROCESS_URL}")
+    print(f"  Model:       {MODEL_PATH}")
+    if HACKATHON_API_KEY:
+        print(f"  Stream API Key: {HACKATHON_API_KEY[:8]}...")
     print()
     
     # Start statistics thread
@@ -346,7 +356,7 @@ def main():
     # Connect to stream
     try:
         print("🔌 Connecting to stream...")
-        response = requests.get(STREAM_URL, headers=headers, stream=True, verify=False)
+        response = requests.get(STREAM_URL, headers=stream_headers, stream=True, verify=False)
         response.raise_for_status()
         client = SSEClient(response)
         print("✅ Connected to stream! Waiting for transactions...\n")

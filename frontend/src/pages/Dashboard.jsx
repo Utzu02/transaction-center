@@ -168,6 +168,19 @@ const Dashboard = () => {
       const formattedTransaction = formatTransaction(transaction);
       const startTime = Date.now();
       
+      // Save to database automatically
+      const saveToDatabase = async () => {
+        try {
+          await apiService.createTransaction(transaction);
+          console.log(`✅ Saved transaction ${transaction.trans_num || transaction.id} to database`);
+          // Refresh DB transactions after save
+          fetchTransactions();
+        } catch (error) {
+          console.error('❌ Failed to save transaction to database:', error);
+        }
+      };
+      saveToDatabase();
+      
       // Store transaction
       setProcessedTransactions(prev => [...prev, formattedTransaction].slice(-100)); // Keep last 100
       

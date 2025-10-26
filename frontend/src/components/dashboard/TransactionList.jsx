@@ -1,9 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Eye, Download, ArrowUpRight } from 'lucide-react';
+import { Eye, Download, ArrowUpRight, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Card from '../common/Card';
 import Badge from '../common/Badge';
 import Button from '../common/Button';
+import ConfirmDialog from '../common/ConfirmDialog';
+import TransactionPreviewModal from '../common/TransactionPreviewModal';
+import { useToast } from '../common/ToastContainer';
+import apiService from '../../services/api';
 
 const TransactionList = ({ 
   transactions = [], 
@@ -27,7 +31,10 @@ const TransactionList = ({
   filterAmountRange = [0, 5000]
 }) => {
   const navigate = useNavigate();
+  const toast = useToast();
   const [selectedTransactions, setSelectedTransactions] = useState(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, transactionId: null, transactionNum: null });
+  const [previewTransaction, setPreviewTransaction] = useState(null);
   
   // Notify parent of all transactions for dynamic filter generation (only once on mount)
   useEffect(() => {
@@ -166,6 +173,24 @@ const TransactionList = ({
   const allSelected = displayData.length > 0 && displayData.every(t => selectedTransactions.has(t.id));
   const someSelected = displayData.some(t => selectedTransactions.has(t.id)) && !allSelected;
 
+  const handleDeleteTransaction = async () => {
+    const { transactionNum } = deleteConfirm;
+    if (!transactionNum) return;
+
+    try {
+      await apiService.deleteTransaction(transactionNum);
+      toast.showSuccess(`Transaction ${transactionNum} deleted successfully`, 3000);
+      
+      // Refresh the page or notify parent to reload
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.error('Failed to delete transaction:', error);
+      toast.showError(`Failed to delete transaction: ${error.message}`, 5000);
+    }
+  };
+
   const getStatusBadge = (status) => {
     const statusMap = {
       completed: { variant: 'success', label: 'Accepted' },
@@ -284,6 +309,7 @@ const TransactionList = ({
   };
 
   return (
+    <>
     <Card>
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
         <div>
@@ -391,13 +417,26 @@ const TransactionList = ({
                     </Badge>
                   </td>
                   <td className="py-4 px-4">
-                    <button 
-                      onClick={() => navigate(`/transaction/${transaction.id}`)}
-                      className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => setPreviewTransaction(transaction)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Quick Preview"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      <button 
+                        onClick={() => setDeleteConfirm({ 
+                          isOpen: true, 
+                          transactionId: transaction.id,
+                          transactionNum: transaction.trans_num || transaction.id 
+                        })}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete Transaction"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );
@@ -437,6 +476,24 @@ const TransactionList = ({
         </>
       )}
     </Card>
+    
+    <ConfirmDialog
+      isOpen={deleteConfirm.isOpen}
+      onClose={() => setDeleteConfirm({ isOpen: false, transactionId: null, transactionNum: null })}
+      onConfirm={handleDeleteTransaction}
+      title="Delete Transaction"
+      message={`Are you sure you want to delete transaction ${deleteConfirm.transactionNum}? This action cannot be undone.`}
+      confirmText="Delete"
+      cancelText="Cancel"
+      variant="danger"
+    />
+    
+    <TransactionPreviewModal 
+      isOpen={!!previewTransaction}
+      onClose={() => setPreviewTransaction(null)}
+      transaction={previewTransaction}
+    />
+    </>
   );
 };
 

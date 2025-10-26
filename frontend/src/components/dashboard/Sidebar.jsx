@@ -7,10 +7,12 @@ import {
   Settings
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useNotifications } from '../../contexts/NotificationContext';
 
 const Sidebar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { unreadCount } = useNotifications();
 
   // Derive active item directly from location - no state needed
   const getActiveItem = () => {
@@ -28,7 +30,7 @@ const Sidebar = () => {
   const menuItems = [
     { id: 'dashboard', icon: LayoutDashboard, label: 'Dashboard', badge: null },
     { id: 'transactions', icon: CreditCard, label: 'Transactions', badge: null },
-    { id: 'alerts', icon: AlertTriangle, label: 'Alerts', badge: '12' },
+    { id: 'alerts', icon: AlertTriangle, label: 'Alerts', badge: unreadCount > 0 ? unreadCount.toString() : null },
     { id: 'analytics', icon: BarChart3, label: 'Analytics', badge: null },
     { id: 'settings', icon: Settings, label: 'Settings', badge: null },
   ];
@@ -41,8 +43,8 @@ const Sidebar = () => {
           onClick={() => navigate('/')}
           className="flex items-center gap-3 w-full hover:opacity-80 transition-opacity group"
         >
-          <div className="bg-gradient-to-br from-blue-500 to-cyan-500 p-2 rounded-xl shadow-lg group-hover:shadow-blue-500/50 transition-shadow">
-            <Shield className="w-6 h-6 text-white" />
+          <div className="bg-gradient-to-br from-blue-600 to-indigo-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/30 group-hover:shadow-blue-500/60 transition-all">
+            <Shield className="w-5 h-5 text-white" strokeWidth={2.5} />
           </div>
           <div className="text-left">
             <h1 className="text-xl font-display font-bold text-white">Fraud Detect</h1>

@@ -5,6 +5,7 @@ import Header from '../components/dashboard/Header';
 import FraudAlert from '../components/dashboard/FraudAlert';
 import Card from '../components/common/Card';
 import Button from '../components/common/Button';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import { useToast } from '../components/common/ToastContainer';
 import apiService from '../services/api';
 
@@ -12,6 +13,7 @@ const Alerts = () => {
   const toast = useToast();
   const [alerts, setAlerts] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, notificationId: null });
   const [stats, setStats] = useState({
     active: 0,
     resolved: 0,
@@ -82,6 +84,43 @@ const Alerts = () => {
     fetchNotifications();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Handle delete notification
+  const handleDeleteNotification = async () => {
+    const notificationId = deleteConfirm.notificationId;
+    
+    if (!notificationId) {
+      toast.showError('Invalid notification ID', 3000);
+      return;
+    }
+
+    try {
+      console.log(`🗑️ Deleting notification: ${notificationId}`);
+      const response = await apiService.deleteNotification(notificationId);
+      
+      if (response.success) {
+        toast.showSuccess('Notification deleted successfully', 3000);
+        
+        // Remove from local state
+        setAlerts(prevAlerts => prevAlerts.filter(alert => alert.id !== notificationId));
+        
+        // Refresh stats
+        fetchNotifications();
+      } else {
+        toast.showError('Failed to delete notification', 3000);
+      }
+    } catch (error) {
+      console.error('❌ Error deleting notification:', error);
+      toast.showError(`Error: ${error.message}`, 3000);
+    } finally {
+      setDeleteConfirm({ isOpen: false, notificationId: null });
+    }
+  };
+
+  // Open delete confirmation dialog
+  const confirmDelete = (notificationId) => {
+    setDeleteConfirm({ isOpen: true, notificationId });
+  };
 
   const alertStats = [
     { label: 'Active', value: stats.active.toString(), icon: AlertTriangle, color: 'danger' },
@@ -169,7 +208,11 @@ const Alerts = () => {
                 ) : (
                   <div className="space-y-4">
                     {alerts.map((alert) => (
-                      <FraudAlert key={alert.id} alert={alert} />
+                      <FraudAlert 
+                        key={alert.id} 
+                        alert={alert} 
+                        onDelete={confirmDelete}
+                      />
                     ))}
                   </div>
                 )}
@@ -178,6 +221,18 @@ const Alerts = () => {
           </div>
         </main>
       </div>
+      
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => setDeleteConfirm({ isOpen: false, notificationId: null })}
+        onConfirm={handleDeleteNotification}
+        title="Delete Notification"
+        message="Are you sure you want to delete this notification? This action cannot be undone."
+        confirmText="Delete"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 };

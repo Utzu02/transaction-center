@@ -9,19 +9,76 @@ const FraudPatterns = ({ transactions = [] }) => {
 
   useEffect(() => {
     // Calculate patterns from real transactions
-    const now = Date.now() / 1000; // current time in seconds
-    const cutoffTime = now - timeframe;
+    const now = Date.now();
+    const cutoffTime = now - (timeframe * 1000); // convert seconds to milliseconds
     
-    // Filter transactions from last hour/timeframe
-    const recentTransactions = transactions.filter(t => 
-      t.isFraud && t.timestamp && t.timestamp >= cutoffTime
-    );
+    // Filter fraud transactions
+    const fraudTransactions = transactions.filter(t => {
+      const isFraud = t.isFraud || t.is_fraud;
+      if (!isFraud) return false;
+      
+      // Check timeframe
+      let transTime;
+      if (t.timestamp) {
+        transTime = typeof t.timestamp === 'number' ? t.timestamp * 1000 : new Date(t.timestamp).getTime();
+      } else if (t.created_at) {
+        transTime = new Date(t.created_at).getTime();
+      } else if (t.unix_time) {
+        transTime = t.unix_time * 1000;
+      } else {
+        return true; // Include if no timestamp (from DB)
+      }
+      
+      return transTime >= cutoffTime;
+    });
 
-    // Count patterns
+    // Analyze patterns based on transaction characteristics
     const patternCounts = {};
-    recentTransactions.forEach(t => {
-      const pattern = t.pattern || 'Other';
-      patternCounts[pattern] = (patternCounts[pattern] || 0) + 1;
+    
+    fraudTransactions.forEach(t => {
+      const patterns = [];
+      
+      // High-Value Transaction (over $500)
+      const amount = t.amt || t.amount || 0;
+      if (amount > 500) {
+        patterns.push('High-Value Transaction');
+      }
+      
+      // Unusual Time (night hours 22:00-06:00)
+      if (t.trans_time) {
+        const hour = parseInt(t.trans_time.split(':')[0]);
+        if (hour >= 22 || hour < 6) {
+          patterns.push('Unusual Time');
+        }
+      }
+      
+      // Online/Gas Purchase (specific categories)
+      const category = t.category || '';
+      if (category.includes('online') || category.includes('shopping_net')) {
+        patterns.push('Online Purchase Risk');
+      } else if (category.includes('gas') || category.includes('travel')) {
+        patterns.push('Travel/Gas Anomaly');
+      } else if (category.includes('grocery') || category.includes('food')) {
+        patterns.push('Retail Fraud');
+      }
+      
+      // Geographical Anomaly (large distance from customer to merchant)
+      // This would need distance calculation, skip for now or use a threshold
+      
+      // Micro-Transaction (very small amounts that might be testing)
+      if (amount > 0 && amount < 10) {
+        patterns.push('Micro-Transaction Pattern');
+      }
+      
+      // If no specific pattern found, categorize as "Suspicious Behavior"
+      if (patterns.length === 0) {
+        patterns.push('Suspicious Behavior');
+      }
+      
+      // Count each pattern
+      patterns.forEach(pattern => {
+        patternCounts[pattern] = (patternCounts[pattern] || 0) + 1;
+      });
     });
 
     // Convert to array and sort by count
@@ -44,7 +101,9 @@ const FraudPatterns = ({ transactions = [] }) => {
       'Unusual Time': '#eab308',
       'Online Purchase Risk': '#3b82f6',
       'Micro-Transaction Pattern': '#8b5cf6',
-      'Suspicious Behavior': '#ec4899'
+      'Suspicious Behavior': '#ec4899',
+      'Travel/Gas Anomaly': '#f97316',
+      'Retail Fraud': '#06b6d4'
     };
     return colors[pattern] || '#6b7280';
   };

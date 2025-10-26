@@ -3,11 +3,13 @@ import { AlertTriangle, CheckCircle, Clock, TrendingUp, Eye } from 'lucide-react
 import Card from '../common/Card';
 import Badge from '../common/Badge';
 import { useNavigate } from 'react-router-dom';
+import TransactionPreviewModal from '../common/TransactionPreviewModal';
 
 const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
   const navigate = useNavigate();
   const feedRef = useRef(null);
   const [autoScroll, setAutoScroll] = useState(true);
+  const [previewTransaction, setPreviewTransaction] = useState(null);
 
   // Auto-scroll to bottom when new transactions arrive
   useEffect(() => {
@@ -17,8 +19,8 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
   }, [transactions, autoScroll]);
 
   const getStatusColor = (transaction) => {
-    if (transaction.isFraud) return 'danger';
-    if (transaction.riskScore > 60) return 'warning';
+    if (transaction.isFraud || transaction.is_fraud) return 'danger';
+    if ((transaction.riskScore || 0) > 60) return 'warning';
     return 'success';
   };
 
@@ -31,14 +33,27 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
 
   const formatTimestamp = (timestamp) => {
     if (!timestamp) return 'Just now';
-    const date = new Date(timestamp * 1000);
+    
+    let date;
+    if (typeof timestamp === 'number') {
+      // Unix timestamp (in seconds or milliseconds)
+      date = timestamp > 10000000000 ? new Date(timestamp) : new Date(timestamp * 1000);
+    } else if (typeof timestamp === 'string') {
+      // ISO string
+      date = new Date(timestamp);
+    } else {
+      return 'Just now';
+    }
+    
     const now = new Date();
     const diffMs = now - date;
     const diffSec = Math.floor(diffMs / 1000);
     
+    if (diffSec < 0) return 'Just now';
     if (diffSec < 60) return `${diffSec}s ago`;
     if (diffSec < 3600) return `${Math.floor(diffSec / 60)}m ago`;
-    return date.toLocaleTimeString();
+    if (diffSec < 86400) return `${Math.floor(diffSec / 3600)}h ago`;
+    return date.toLocaleDateString();
   };
 
   return (
@@ -73,10 +88,10 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
           transactions.map((transaction, index) => (
             <div
               key={`${transaction.id}-${index}`}
-              className={`p-4 rounded-lg border-2 transition-all duration-500 animate-fadeIn ${
-                transaction.isFraud
+              className={`p-4 rounded-lg border-2 transition-all duration-300 ${
+                (transaction.isFraud || transaction.is_fraud)
                   ? 'border-red-300 bg-red-50'
-                  : transaction.riskScore > 60
+                  : (transaction.riskScore || 0) > 60
                   ? 'border-yellow-300 bg-yellow-50'
                   : 'border-green-300 bg-green-50'
               }`}
@@ -84,39 +99,39 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
               <div className="flex items-start justify-between">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
-                    {transaction.isFraud ? (
+                    {(transaction.isFraud || transaction.is_fraud) ? (
                       <AlertTriangle className="w-5 h-5 text-red-600" />
                     ) : (
                       <CheckCircle className="w-5 h-5 text-green-600" />
                     )}
                     <span className="font-semibold text-gray-900">
-                      ${transaction.amount.toFixed(2)}
+                      ${(transaction.amount || transaction.amt || 0).toFixed(2)}
                     </span>
                     <Badge variant={getStatusColor(transaction)}>
-                      {transaction.isFraud ? 'FRAUD' : getRiskLevel(transaction.riskScore)}
+                      {(transaction.isFraud || transaction.is_fraud) ? 'FRAUD' : getRiskLevel(transaction.riskScore || 0)}
                     </Badge>
                     <span className="text-xs text-gray-500">
-                      {formatTimestamp(transaction.timestamp)}
+                      {formatTimestamp(transaction.timestamp || transaction.unix_time || transaction.created_at)}
                     </span>
                   </div>
 
                   <div className="space-y-1 text-sm text-gray-700">
                     <p>
-                      <span className="font-medium">{transaction.customer}</span> at{' '}
-                      <span className="font-medium">{transaction.merchant}</span>
+                      <span className="font-medium">{transaction.customer || `${transaction.first || ''} ${transaction.last || ''}`.trim() || 'Unknown'}</span> at{' '}
+                      <span className="font-medium">{transaction.merchant || 'Unknown Merchant'}</span>
                     </p>
                     <div className="flex items-center gap-3 text-xs text-gray-600">
-                      <span>📍 {transaction.location}</span>
-                      <span>🏷️ {transaction.category}</span>
+                      <span>📍 {transaction.location || transaction.city || 'Unknown'}</span>
+                      <span>🏷️ {transaction.category || 'N/A'}</span>
                       {transaction.distance && (
                         <span>📏 {transaction.distance.toFixed(0)}km from home</span>
                       )}
                     </div>
                   </div>
 
-                  {transaction.isFraud && (
+                  {(transaction.isFraud || transaction.is_fraud) && (
                     <div className="mt-2 p-2 bg-red-100 rounded text-xs text-red-800">
-                      <strong>Pattern:</strong> {transaction.pattern}
+                      <strong>Pattern:</strong> {transaction.pattern || 'Suspicious Activity'}
                     </div>
                   )}
                 </div>
@@ -135,9 +150,9 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
                   </div>
                   
                   <button
-                    onClick={() => navigate(`/transaction/${transaction.id}`)}
-                    className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-gray-50 transition-colors"
-                    title="View Details"
+                    onClick={() => setPreviewTransaction(transaction)}
+                    className="p-2 rounded-lg bg-white border border-gray-300 hover:bg-blue-50 hover:border-blue-400 transition-colors"
+                    title="Quick Preview"
                   >
                     <Eye className="w-4 h-4 text-gray-600" />
                   </button>
@@ -147,6 +162,12 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
           ))
         )}
       </div>
+      
+      <TransactionPreviewModal 
+        isOpen={!!previewTransaction}
+        onClose={() => setPreviewTransaction(null)}
+        transaction={previewTransaction}
+      />
 
       <style dangerouslySetInnerHTML={{__html: `
         .custom-scrollbar::-webkit-scrollbar {

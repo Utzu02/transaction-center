@@ -4,33 +4,28 @@ import Card from '../common/Card';
 import AgePieChart from '../charts/AgePieChart';
 
 const AgeSegmentAnalysis = ({ transactions = [] }) => {
-  // Mock data for initial display
-  const mockData = [
-    { segment: '18-24', fraudCount: 45, label: '18-24 years', value: 45, color: '#ef4444' },
-    { segment: '25-34', fraudCount: 78, label: '25-34 years', value: 78, color: '#f59e0b' },
-    { segment: '35-44', fraudCount: 62, label: '35-44 years', value: 62, color: '#eab308' },
-    { segment: '45-54', fraudCount: 34, label: '45-54 years', value: 34, color: '#3b82f6' },
-    { segment: '55-64', fraudCount: 28, label: '55-64 years', value: 28, color: '#8b5cf6' },
-    { segment: '65+', fraudCount: 19, label: '65+ years', value: 19, color: '#10b981' }
-  ];
-
-  const [chartData, setChartData] = useState(mockData);
+  const [chartData, setChartData] = useState([]);
   const [stats, setStats] = useState({ 
-    total: mockData.reduce((sum, item) => sum + item.value, 0), 
-    mostVulnerable: mockData.reduce((max, item) => item.value > (max?.value || 0) ? item : max, mockData[0])
+    total: 0, 
+    mostVulnerable: null
   });
 
   useEffect(() => {
-    // Calculate age segments from fraud transactions
-    const fraudTransactions = transactions.filter(t => t.isFraud);
+    console.log(`📊 AgeSegmentAnalysis received ${transactions.length} transactions`);
     
-    // If no fraud transactions, use mock data
+    // Calculate age segments from fraud transactions
+    const fraudTransactions = transactions.filter(t => {
+      const isFraudValue = t.isFraud || t.is_fraud;
+      // Handle various fraud flag formats (boolean, string, number)
+      return isFraudValue === true || isFraudValue === 1 || isFraudValue === '1' || isFraudValue === 'true';
+    });
+    
+    console.log(`📊 Found ${fraudTransactions.length} fraud transactions`);
+    
+    // If no fraud transactions, clear data
     if (fraudTransactions.length === 0) {
-      setChartData(mockData);
-      setStats({ 
-        total: mockData.reduce((sum, item) => sum + item.value, 0), 
-        mostVulnerable: mockData.reduce((max, item) => item.value > (max?.value || 0) ? item : max, mockData[0])
-      });
+      setChartData([]);
+      setStats({ total: 0, mostVulnerable: null });
       return;
     }
 
@@ -44,7 +39,33 @@ const AgeSegmentAnalysis = ({ transactions = [] }) => {
     };
 
     fraudTransactions.forEach(t => {
-      const segment = t.ageSegment;
+      // Calculate age from DOB if available
+      let age = null;
+      if (t.dob) {
+        const birthDate = new Date(t.dob);
+        const today = new Date();
+        age = today.getFullYear() - birthDate.getFullYear();
+        const monthDiff = today.getMonth() - birthDate.getMonth();
+        if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+          age--;
+        }
+      } else if (t.age) {
+        age = t.age;
+      }
+      
+      // Determine age segment
+      let segment = null;
+      if (age !== null) {
+        if (age >= 18 && age <= 24) segment = '18-24';
+        else if (age >= 25 && age <= 34) segment = '25-34';
+        else if (age >= 35 && age <= 44) segment = '35-44';
+        else if (age >= 45 && age <= 54) segment = '45-54';
+        else if (age >= 55 && age <= 64) segment = '55-64';
+        else if (age >= 65) segment = '65+';
+      } else if (t.ageSegment) {
+        segment = t.ageSegment;
+      }
+      
       if (segment && segmentCounts[segment]) {
         segmentCounts[segment].count++;
       }
@@ -84,7 +105,7 @@ const AgeSegmentAnalysis = ({ transactions = [] }) => {
         </div>
       </div>
 
-      {chartData.length > 0 && (
+      {chartData.length > 0 ? (
         <div className="space-y-6">
           {/* Most Vulnerable Segment */}
           {stats.mostVulnerable && (
@@ -113,6 +134,12 @@ const AgeSegmentAnalysis = ({ transactions = [] }) => {
           <div className="flex justify-center">
             <AgePieChart data={chartData} height={400} />
           </div>
+        </div>
+      ) : (
+        <div className="text-center py-12 text-gray-500">
+          <Users className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>No fraud data with age information available yet</p>
+          <p className="text-sm">Data will appear as fraud with age/DOB is detected</p>
         </div>
       )}
     </Card>

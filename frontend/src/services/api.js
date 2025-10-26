@@ -85,6 +85,16 @@ class ApiService {
     return this.request('/api/transactions/stats');
   }
 
+  /**
+   * Delete a transaction
+   * @param {string} transNum - Transaction number
+   */
+  async deleteTransaction(transNum) {
+    return this.request(`/api/transactions/${transNum}`, {
+      method: 'DELETE',
+    });
+  }
+
   // ==================== ANALYTICS ====================
 
   /**

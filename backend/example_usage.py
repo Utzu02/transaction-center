@@ -5,7 +5,6 @@ Example usage of the fraud detection system.
 import pandas as pd
 import numpy as np
 from fraud_detector import FraudDetector
-from streaming import StreamingHandler, run_stream_in_background
 from utils import load_csv_data
 import argparse
 import sys
@@ -148,17 +147,17 @@ def predict_example(csv_path: str, model_path: str = 'fraud_detector_model.pkl')
     return predictions, probabilities
 
 
-def streaming_example(stream_url: str, report_url: str = None, model_path: str = 'fraud_detector_model.pkl'):
+def batch_process_example(csv_path: str, model_path: str = 'fraud_detector_model.pkl', output_path: str = None):
     """
-    Example: Real-time fraud detection from streaming data.
+    Example: Batch process transactions and output results.
     
     Args:
-        stream_url: URL for SSE stream
-        report_url: URL to report predictions to
+        csv_path: Path to CSV file with transactions
         model_path: Path to saved model
+        output_path: Optional path to save results (default: input_path + '_processed.csv')
     """
     print("="*60)
-    print("FRAUD DETECTION - REAL-TIME STREAMING")
+    print("FRAUD DETECTION - BATCH PROCESSING")
     print("="*60)
     
     # Load model
@@ -166,47 +165,48 @@ def streaming_example(stream_url: str, report_url: str = None, model_path: str =
     detector = FraudDetector()
     detector.load_model(model_path)
     
-    # Define callback function
-    def fraud_detection_callback(event_data):
-        """Process each streaming event."""
-        prediction, probability, details = detector.predict_single(event_data)
-        return details
+    # Load data
+    print(f"\nLoading data from {csv_path}...")
+    df = load_csv_data(csv_path)
+    print(f"Loaded {len(df)} transactions")
     
-    # Start streaming
-    print("\nStarting real-time detection...")
-    handler = StreamingHandler(stream_url, fraud_detection_callback, report_url)
+    # Process in batches
+    print("\nProcessing transactions...")
+    predictions, probabilities, df_processed = detector.predict(df)
     
-    try:
-        handler.start()
-    except KeyboardInterrupt:
-        print("\n\nStopping...")
-        handler.stop()
+    # Add results to dataframe
+    df['is_fraud'] = predictions
+    df['fraud_probability'] = probabilities
+    df['status'] = df['is_fraud'].apply(lambda x: 'flagged' if x == 1 else 'cleared')
     
-    # Show statistics
-    print("\n" + "="*60)
-    print("STATISTICS")
-    print("="*60)
-    stats = handler.get_stats()
-    print(f"\nTotal events processed: {stats['total_events']}")
-    print(f"Fraud detected: {stats['fraud_detected']} ({stats['fraud_rate']*100:.2f}%)")
-    print(f"Timeouts: {stats['timeouts']}")
-    print(f"Errors: {stats['errors']}")
-    print(f"Runtime: {stats['runtime_seconds']:.1f} seconds")
-    print(f"Processing rate: {stats['events_per_second']:.2f} events/second")
+    # Statistics
+    fraud_count = predictions.sum()
+    print(f"\nResults:")
+    print(f"  Total transactions: {len(df)}")
+    print(f"  Fraud detected: {fraud_count} ({fraud_count/len(df)*100:.2f}%)")
+    print(f"  Legitimate: {len(df) - fraud_count} ({(len(df) - fraud_count)/len(df)*100:.2f}%)")
+    
+    # Save results
+    if output_path is None:
+        output_path = csv_path.replace('.csv', '_processed.csv')
+    
+    df.to_csv(output_path, index=False)
+    print(f"\nProcessed transactions saved to {output_path}")
+    
+    return df
 
 
 def main():
     """Main entry point."""
     parser = argparse.ArgumentParser(description='POS Fraud Detection System')
-    parser.add_argument('mode', choices=['train', 'predict', 'stream'], 
-                       help='Operation mode')
+    parser.add_argument('mode', choices=['train', 'predict', 'batch'], 
+                       help='Operation mode (train, predict, or batch)')
     parser.add_argument('--csv', type=str, help='Path to CSV file')
     parser.add_argument('--model', type=str, default='fraud_detector_model.pkl',
                        help='Path to model file')
     parser.add_argument('--n-samples', type=int, default=None,
                        help='Number of samples to use for training')
-    parser.add_argument('--stream-url', type=str, help='SSE stream URL')
-    parser.add_argument('--report-url', type=str, help='URL to report predictions')
+    parser.add_argument('--output', type=str, help='Output path for processed results')
     
     args = parser.parse_args()
     
@@ -223,11 +223,11 @@ def main():
                 sys.exit(1)
             predict_example(args.csv, args.model)
             
-        elif args.mode == 'stream':
-            if not args.stream_url:
-                print("Error: --stream-url required for streaming")
+        elif args.mode == 'batch':
+            if not args.csv:
+                print("Error: --csv required for batch processing")
                 sys.exit(1)
-            streaming_example(args.stream_url, args.report_url, args.model)
+            batch_process_example(args.csv, args.model, args.output)
             
     except Exception as e:
         print(f"\nError: {e}")

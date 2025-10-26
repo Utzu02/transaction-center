@@ -3,13 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import Card from '../common/Card';
 import Badge from '../common/Badge';
 import Button from '../common/Button';
-import { useState } from 'react';
 
-const FraudAlert = ({ alert }) => {
-  const [isVisible, setIsVisible] = useState(true);
+const FraudAlert = ({ alert, onDelete }) => {
   const navigate = useNavigate();
-  
-  if (!isVisible) return null;
   
   const severityColors = {
     high: 'danger',
@@ -20,8 +16,9 @@ const FraudAlert = ({ alert }) => {
   return (
     <Card className="border-l-4 border-red-500 relative hover:shadow-xl transition-all">
       <button
-        onClick={() => setIsVisible(false)}
-        className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+        onClick={() => onDelete && onDelete(alert.id)}
+        className="absolute top-4 right-4 text-gray-400 hover:text-red-600 transition-colors"
+        title="Delete notification"
       >
         <X className="w-5 h-5" />
       </button>

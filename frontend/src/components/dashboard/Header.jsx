@@ -1,4 +1,4 @@
-import { User } from 'lucide-react';
+import { Shield } from 'lucide-react';
 import NotificationDropdown from './NotificationDropdown';
 
 const Header = () => {
@@ -15,8 +15,8 @@ const Header = () => {
               <p className="text-sm font-semibold text-gray-900">Admin User</p>
               <p className="text-xs text-gray-500">admin@rafallos.com</p>
             </div>
-            <button className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/50 transition-all transform hover:scale-105">
-              <User className="w-5 h-5" />
+            <button className="p-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl hover:shadow-lg hover:shadow-blue-500/50 transition-all transform hover:scale-105">
+              <Shield className="w-5 h-5" strokeWidth={2.5} />
             </button>
           </div>
         </div>

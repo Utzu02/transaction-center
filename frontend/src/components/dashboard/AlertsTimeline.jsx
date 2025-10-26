@@ -9,25 +9,55 @@ const AlertsTimeline = ({ transactions = [] }) => {
 
   useEffect(() => {
     // Process last 2 hours of fraud alerts
-    const now = Date.now() / 1000;
-    const twoHoursAgo = now - (2 * 3600);
+    const now = Date.now();
+    const twoHoursAgo = now - (2 * 3600 * 1000); // milliseconds
     
     // Filter fraud transactions from last 2 hours
-    const fraudTransactions = transactions.filter(t => 
-      t.isFraud && t.timestamp && t.timestamp >= twoHoursAgo
-    );
+    const fraudTransactions = transactions.filter(t => {
+      const isFraud = t.isFraud || t.is_fraud;
+      if (!isFraud) return false;
+      
+      // Get transaction time in milliseconds
+      let transTime;
+      if (t.timestamp) {
+        transTime = typeof t.timestamp === 'number' 
+          ? (t.timestamp > 10000000000 ? t.timestamp : t.timestamp * 1000)
+          : new Date(t.timestamp).getTime();
+      } else if (t.created_at) {
+        transTime = new Date(t.created_at).getTime();
+      } else if (t.unix_time) {
+        transTime = t.unix_time * 1000;
+      } else {
+        return true; // Include if no timestamp
+      }
+      
+      return transTime >= twoHoursAgo;
+    });
 
     // Group by 15-minute intervals
     const intervals = [];
-    const intervalDuration = 15 * 60; // 15 minutes in seconds
+    const intervalDuration = 15 * 60 * 1000; // 15 minutes in milliseconds
     
     for (let i = 0; i < 8; i++) { // 8 intervals = 2 hours
       const intervalStart = now - ((8 - i) * intervalDuration);
       const intervalEnd = intervalStart + intervalDuration;
       
-      const count = fraudTransactions.filter(t => 
-        t.timestamp >= intervalStart && t.timestamp < intervalEnd
-      ).length;
+      const count = fraudTransactions.filter(t => {
+        let transTime;
+        if (t.timestamp) {
+          transTime = typeof t.timestamp === 'number' 
+            ? (t.timestamp > 10000000000 ? t.timestamp : t.timestamp * 1000)
+            : new Date(t.timestamp).getTime();
+        } else if (t.created_at) {
+          transTime = new Date(t.created_at).getTime();
+        } else if (t.unix_time) {
+          transTime = t.unix_time * 1000;
+        } else {
+          return false;
+        }
+        
+        return transTime >= intervalStart && transTime < intervalEnd;
+      }).length;
 
       const label = i === 7 ? 'Now' : 
                     i === 6 ? '15m' :
@@ -121,6 +151,7 @@ const AlertsTimeline = ({ transactions = [] }) => {
                 fill="url(#colorAlerts)"
                 dot={{ fill: '#ef4444', r: 4 }}
                 activeDot={{ r: 6, fill: '#dc2626' }}
+                isAnimationActive={false}
               />
             </AreaChart>
           </ResponsiveContainer>

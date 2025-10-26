@@ -6,6 +6,7 @@ Handles all transaction-related business logic
 from datetime import datetime
 from utils.database import get_db
 from utils.validators import validate_transaction
+from services.notification_service import NotificationService
 
 class TransactionService:
     """Service class for transaction operations"""
@@ -87,10 +88,44 @@ class TransactionService:
         # Insert transaction
         try:
             result = db.transactions.insert_one(transaction)
+            transaction_id = str(result.inserted_id)
+            trans_num = transaction_data['trans_num']
+            
+            # Create notification if fraud detected
+            if transaction.get('is_fraud'):
+                fraud_probability = transaction_data.get('fraud_probability', 0)
+                confidence = transaction_data.get('confidence', 0)
+                
+                # Determine severity based on probability and confidence
+                if confidence >= 0.7:
+                    severity = 'high'
+                elif confidence >= 0.4:
+                    severity = 'medium'
+                else:
+                    severity = 'low'
+                
+                notification_data = {
+                    'title': f'🚨 Fraud Alert - ${transaction["amt"]:.2f}',
+                    'message': f'Suspicious transaction detected at {transaction["merchant"]}. Amount: ${transaction["amt"]:.2f}. Category: {transaction.get("category", "N/A")}. Confidence: {confidence:.1%}',
+                    'text': f'Fraud detected: {transaction["merchant"]} - ${transaction["amt"]:.2f}',
+                    'type': severity,
+                    'transaction_id': trans_num,
+                    'amount': transaction['amt'],
+                    'merchant': transaction['merchant'],
+                    'category': transaction.get('category'),
+                    'fraud_probability': fraud_probability,
+                    'confidence': confidence
+                }
+                
+                # Add notification to database
+                NotificationService.add_notification(notification_data)
+                print(f"✅ Created fraud notification for transaction {trans_num}")
+            
             return {
                 'success': True,
-                'transaction_id': str(result.inserted_id),
-                'trans_num': transaction_data['trans_num']
+                'transaction_id': transaction_id,
+                'trans_num': trans_num,
+                'fraud_detected': transaction.get('is_fraud', False)
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}
