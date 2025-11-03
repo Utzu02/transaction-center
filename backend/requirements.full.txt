@@ -1,0 +1,27 @@
+Flask==3.0.0
+flask-cors==4.0.0
+Werkzeug==3.0.1
+
+# Database
+pymongo==4.6.1
+
+# Environment Variables
+python-dotenv==1.0.0
+
+# Data Processing (heavy - kept in full requirements file)
+pandas==2.1.4
+numpy==1.26.2
+
+# Fraud Detection (existing heavy deps)
+scikit-learn==1.3.2
+scipy==1.11.4
+
+# SSE Client (for hackathon stream)
+sseclient-py==1.8.0
+
+# HTTP Requests
+requests==2.31.0
+urllib3==2.1.0
+
+# Optional: Better development server
+gunicorn==21.2.0

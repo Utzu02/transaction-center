@@ -63,14 +63,14 @@ lock = threading.Lock()
 # 0.15 = 15% fraud (balanced)
 # 0.25 = 25% fraud (mai mult) ← PENTRU MAI MULT FRAUD
 # 0.35 = 35% fraud (foarte mult)
-TARGET_FRAUD_RATE = 0.465  # ← CRESCUT pentru mai mult fraud detectat!
+TARGET_FRAUD_RATE = 0.22  # ← CRESCUT pentru mai mult fraud detectat!
 
 # Minim confidence pentru a flaga (0-1)
 # 0.0 = TOATE tranzacțiile (maxim fraud detectat)
 # 0.15 = aproape toate (foarte mult fraud detectat) ← SETAT
 # 0.3 = și tranzacții incerte (mai mult fraud detectat)
 # 0.5 = doar tranzacții confident (mai puțin fraud, dar mai precis)
-MIN_CONFIDENCE = 0.5  # ← Acceptă tranzacții cu confidence >= 0.15
+MIN_CONFIDENCE = 0.55  # ← Acceptă tranzacții cu confidence >= 0.15
 
 # ============================================================================
 # SETUP

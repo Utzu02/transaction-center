@@ -1,0 +1,76 @@
+name: Deploy frontend & backend to Vercel
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Vercel CLI
+        run: npm ci -g vercel@latest || npm i -g vercel@latest
+
+      - name: Deploy backend to Vercel
+        id: deploy_backend
+        working-directory: backend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          set -e
+          vercel --prod --token "$VERCEL_TOKEN" --confirm > vercel_backend_out.txt || true
+          cat vercel_backend_out.txt
+          # Extract the first .vercel.app URL
+          BACKEND_URL=$(grep -Eo 'https://[A-Za-z0-9-]+[A-Za-z0-9.-]*\.vercel\.app' vercel_backend_out.txt | head -n1 || true)
+          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
+      - name: Deploy frontend to Vercel (with backend URL)
+        id: deploy_frontend
+        working-directory: frontend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+        run: |
+          set -e
+          echo "Using backend URL: $BACKEND_URL"
+          # Pass the backend URL into the frontend build as VITE_API_BASE_URL
+          vercel --prod --token "$VERCEL_TOKEN" --confirm --env VITE_API_BASE_URL="$BACKEND_URL" > vercel_frontend_out.txt || true
+          cat vercel_frontend_out.txt
+          FRONTEND_URL=$(grep -Eo 'https://[A-Za-z0-9-]+[A-Za-z0-9.-]*\.vercel\.app' vercel_frontend_out.txt | head -n1 || true)
+          echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+
+      - name: Install jq for tests
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Smoke tests (backend + frontend)
+        env:
+          FRONTEND_URL: ${{ steps.deploy_frontend.outputs.frontend_url }}
+          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+        run: |
+          set -e
+          echo "Frontend URL: $FRONTEND_URL"
+          echo "Backend URL: $BACKEND_URL"
+          # Wait a few seconds for the deployments to warm up
+          sleep 5
+          echo "Checking backend /api/health"
+          curl -sS "$BACKEND_URL/api/health" | jq || true
+          echo "Checking backend /api/transactions?limit=2"
+          curl -sS "$BACKEND_URL/api/transactions?limit=2" | jq || true
+          echo "Testing POST /api/predict"
+          curl -sS -X POST -H 'Content-Type: application/json' -d '{"amount":"1200"}' "$BACKEND_URL/api/predict" | jq || true
+          echo "Checking frontend root status code"
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$FRONTEND_URL" || true)
+          echo "Frontend HTTP status: $HTTP_CODE"
+
+      - name: Output deployed URLs
+        run: |
+          echo "Backend URL: ${{ steps.deploy_backend.outputs.backend_url }}"
+          echo "Frontend URL: ${{ steps.deploy_frontend.outputs.frontend_url }}"

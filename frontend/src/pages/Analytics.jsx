@@ -26,6 +26,51 @@ const Analytics = () => {
     detectionRate: 0
   });
 
+
+  const RISK_BUCKETS = [
+    { name: 'Legitimate', key: 'low', color: '#22c55e' },
+    { name: 'Medium Risk', key: 'medium', color: '#f59e0b' },
+    { name: 'High Risk', key: 'high', color: '#ef4444' },
+    { name: 'Unscored', key: 'unscored', color: '#9ca3af' },
+  ];
+
+  const isFraudish = (t) => {
+    const s = String(t.status ?? '').toLowerCase();
+    return Boolean(t.is_fraud || t.isFraud || t.fraud || ['blocked', 'unknown', 'fraud', 'declined'].includes(s));
+  };
+
+  const pickRiskScore01 = (t) => {
+    const raw =
+      t.fraud_probability ??
+      t.confidence ??
+      t.risk_score ??
+      t.score ??
+      t.anomaly_score;
+
+    if (raw == null) return undefined;
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return undefined;
+    if (n > 1) return Math.max(0, Math.min(1, n / 100)); // scale 0..100 -> 0..1
+    return Math.max(0, Math.min(1, n)); // clamp 0..1
+  };
+
+  const bucketFor = (t) => {
+    const score = pickRiskScore01(t);
+    if (score == null) return isFraudish(t) ? 'high' : 'unscored';
+    if (score >= 0.7 || isFraudish(t)) return 'high';
+    if (score >= 0.4) return 'medium';
+    return 'low';
+  };
+
+  const computeRiskDistribution = (txs) => {
+    const counts = { low: 0, medium: 0, high: 0, unscored: 0 };
+    for (const t of txs) counts[bucketFor(t)] += 1;
+
+    return RISK_BUCKETS
+      .map(b => ({ name: b.name, value: counts[b.key], count: counts[b.key], color: b.color }))
+      .filter(d => d.count > 0);
+  };
+
   // Fetch transactions from database
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -34,33 +79,6 @@ const Analytics = () => {
         const response = await apiService.getTransactions({ limit: 1000 });
         if (response.success && response.transactions) {
           setDbTransactions(response.transactions);
-          
-          // Calculate risk distribution based on real data
-          // Consistent fraud detection: check is_fraud, isFraud, OR status === 'blocked' or 'unknown'
-          const fraudCount = response.transactions.filter(t => 
-            t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown'
-          ).length;
-          const legitimateCount = response.transactions.length - fraudCount;
-          
-          // Categorize by fraud probability or status
-          const highRisk = response.transactions.filter(t => 
-            (t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown') && (t.fraud_probability > 0.7 || t.confidence > 0.7)
-          ).length;
-          
-          const mediumRisk = response.transactions.filter(t => 
-            (t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown') && (t.fraud_probability <= 0.7 && t.fraud_probability > 0.4)
-          ).length;
-          
-          const lowRisk = legitimateCount;
-          
-          // Only include categories with data
-          const distribution = [
-            { name: 'Legitimate', value: lowRisk, count: lowRisk, color: '#22c55e' },
-            { name: 'Medium Risk', value: mediumRisk, count: mediumRisk, color: '#f59e0b' },
-            { name: 'High Risk', value: highRisk, count: highRisk, color: '#ef4444' },
-          ].filter(item => item.count > 0); // Only show categories with transactions
-          
-          setRiskDistribution(distribution);
         }
       } catch (error) {
         console.error('Error fetching transactions:', error);
@@ -72,18 +90,23 @@ const Analytics = () => {
     fetchTransactions();
   }, []);
 
+  useEffect(() => {
+  const all = [...dbTransactions, ...processedTransactions];
+  setRiskDistribution(computeRiskDistribution(all));
+}, [dbTransactions, processedTransactions]);
+
   // Subscribe to real-time transactions
   useEffect(() => {
     const handleTransaction = (transaction) => {
       const formattedTransaction = formatTransaction(transaction);
       setProcessedTransactions(prev => [...prev, formattedTransaction].slice(-100));
-      
+
       setLiveStats(prev => {
         const newProcessed = prev.processed + 1;
-        const newFraudDetected = formattedTransaction.isFraud 
-          ? prev.fraudDetected + 1 
+        const newFraudDetected = formattedTransaction.isFraud
+          ? prev.fraudDetected + 1
           : prev.fraudDetected;
-        
+
         return {
           ...prev,
           processed: newProcessed,
@@ -163,7 +186,7 @@ const Analytics = () => {
   const metrics = [
     {
       title: 'Average Transaction Value',
-      value: dbTransactions.length > 0 
+      value: dbTransactions.length > 0
         ? `$${(dbTransactions.reduce((sum, t) => sum + (parseFloat(t.amt || t.amount || 0)), 0) / dbTransactions.length).toFixed(2)}`
         : '$0.00',
       icon: DollarSign,
@@ -194,10 +217,10 @@ const Analytics = () => {
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 via-purple-50 to-gray-50">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
             {/* Page Header */}
@@ -268,43 +291,43 @@ const Analytics = () => {
                       </div>
                     </div>
                   ) : (
-                  <ResponsiveContainer width="100%" height={320}>
-                    <AreaChart data={monthlyData}>
-                      <defs>
-                        <linearGradient id="colorTrans" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8}/>
-                          <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
-                      <XAxis 
-                        dataKey="month" 
-                        stroke="#6366f1" 
-                        style={{ fontSize: '12px', fontWeight: '600' }}
-                      />
-                      <YAxis 
-                        stroke="#6366f1" 
-                        style={{ fontSize: '12px', fontWeight: '600' }}
-                      />
-                      <Tooltip 
-                        contentStyle={{ 
-                          backgroundColor: 'rgba(255, 255, 255, 0.95)', 
-                          border: '2px solid #0ea5e9',
-                          borderRadius: '12px',
-                          boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-                        }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="transactions" 
-                        stroke="#0ea5e9" 
-                        strokeWidth={3}
-                        fillOpacity={1} 
-                        fill="url(#colorTrans)"
-                        isAnimationActive={false}
-                      />
-                    </AreaChart>
-                  </ResponsiveContainer>
+                    <ResponsiveContainer width="100%" height={320}>
+                      <AreaChart data={monthlyData}>
+                        <defs>
+                          <linearGradient id="colorTrans" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#0ea5e9" stopOpacity={0.8} />
+                            <stop offset="95%" stopColor="#0ea5e9" stopOpacity={0} />
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e0e7ff" />
+                        <XAxis
+                          dataKey="month"
+                          stroke="#6366f1"
+                          style={{ fontSize: '12px', fontWeight: '600' }}
+                        />
+                        <YAxis
+                          stroke="#6366f1"
+                          style={{ fontSize: '12px', fontWeight: '600' }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                            border: '2px solid #0ea5e9',
+                            borderRadius: '12px',
+                            boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+                          }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="transactions"
+                          stroke="#0ea5e9"
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#colorTrans)"
+                          isAnimationActive={false}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
                   )}
                 </div>
 
@@ -349,9 +372,9 @@ const Analytics = () => {
                             <Cell key={`cell-${index}`} fill={entry.color} />
                           ))}
                         </Pie>
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)', 
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
                             border: '2px solid #9333ea',
                             borderRadius: '12px',
                             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
@@ -361,8 +384,8 @@ const Analytics = () => {
                             props.payload.name
                           ]}
                         />
-                        <Legend 
-                          verticalAlign="bottom" 
+                        <Legend
+                          verticalAlign="bottom"
                           height={36}
                           formatter={(value, entry) => {
                             const item = entry.payload;

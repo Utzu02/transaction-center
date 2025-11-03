@@ -18,14 +18,14 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const toast = useToast();
   const lastNotificationRef = useRef(0);
-  
+
   const [connectionStatus, setConnectionStatus] = useState('disconnected');
   const [isMonitoring, setIsMonitoring] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionType, setConnectionType] = useState('sse');
-  const [streamConfig, setStreamConfig] = useState({ 
-    url: import.meta.env.VITE_STREAM_URL || 'https://95.217.75.14:8443/stream', 
-    apiKey: import.meta.env.VITE_API_KEY || '' 
+  const [streamConfig, setStreamConfig] = useState({
+    url: import.meta.env.VITE_STREAM_URL || 'https://95.217.75.14:8443/stream',
+    apiKey: import.meta.env.VITE_API_KEY || ''
   });
   const [liveStats, setLiveStats] = useState({
     processed: 0,
@@ -44,10 +44,10 @@ const Dashboard = () => {
     try {
       console.log('📊 Fetching transactions from database...');
       const response = await apiService.getTransactions({ limit: 1000, sort_order: -1 });
-      
+
       if (response.success && response.transactions) {
         console.log(`✅ Loaded ${response.transactions.length} transactions from database`);
-        
+
         // Keep ALL original backend fields and add frontend helpers
         const formatted = response.transactions.map(tx => ({
           ...tx,  // Keep ALL original backend fields
@@ -59,7 +59,7 @@ const Dashboard = () => {
           location: tx.city && tx.state ? `${tx.city}, ${tx.state}` : '',
           isFraud: tx.is_fraud || tx.isFraud || tx.status === 'blocked' || tx.status === 'unknown'
         }));
-        
+
         setDbTransactions(formatted);
       }
     } catch (error) {
@@ -73,7 +73,7 @@ const Dashboard = () => {
   const handleStartMonitoring = () => {
     const url = streamConfig.url.trim();
     const key = streamConfig.apiKey.trim();
-    
+
     if (!url) {
       toast.showError('Please configure the stream URL in Settings first', 3000);
       navigate('/settings');
@@ -101,7 +101,7 @@ const Dashboard = () => {
     // Show connecting toast immediately
     toast.showInfo('🔄 Connecting to fraud detection stream...', 3000);
     setIsConnecting(true);
-    
+
     try {
       if (connectionType === 'sse') {
         sseService.connect(finalUrl, key);
@@ -148,7 +148,7 @@ const Dashboard = () => {
     // Subscribe to connection events for both services
     const handleConnection = (data) => {
       setConnectionStatus(data.status);
-      
+
       // Handle connection success or failure
       if (data.status === 'connected') {
         setIsConnecting(false);
@@ -165,7 +165,7 @@ const Dashboard = () => {
       // Format and analyze transaction
       const formattedTransaction = formatTransaction(transaction);
       const startTime = Date.now();
-      
+
       // Send to backend for processing (fraud detection + save)
       // Backend will analyze, detect fraud, save to DB, and create alerts if needed
       const processTransaction = async () => {
@@ -175,11 +175,11 @@ const Dashboard = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(transaction)
           });
-          
+
           if (response.ok) {
             const result = await response.json();
             console.log(`✅ Transaction processed: ${transaction.trans_num}`, result);
-            
+
             // Refresh DB transactions to show the newly saved transaction
             setTimeout(() => fetchDatabaseTransactions(), 500);
           } else {
@@ -190,20 +190,20 @@ const Dashboard = () => {
         }
       };
       processTransaction();
-      
+
       // Store transaction
       setProcessedTransactions(prev => [...prev, formattedTransaction].slice(-100)); // Keep last 100
-      
+
       // Update stats
       setLiveStats(prev => {
         const newProcessed = prev.processed + 1;
-        const newFraudDetected = formattedTransaction.isFraud 
-          ? prev.fraudDetected + 1 
+        const newFraudDetected = formattedTransaction.isFraud
+          ? prev.fraudDetected + 1
           : prev.fraudDetected;
-        
+
         const endTime = Date.now();
         const responseTime = (endTime - startTime) / 1000;
-        
+
         return {
           ...prev,
           processed: newProcessed,
@@ -225,7 +225,7 @@ const Dashboard = () => {
           );
           lastNotificationRef.current = now;
         }
-        
+
         // Auto-flag to server
         if (streamConfig.apiKey && transaction.trans_num) {
           sseService.flagTransaction(
@@ -271,10 +271,10 @@ const Dashboard = () => {
       try {
         const text = e.target.result;
         const lines = text.split('\n');
-        
+
         // Skip header line
         const dataLines = lines.slice(1).filter(line => line.trim());
-        
+
         let imported = 0;
         let savedCount = 0;
         const newTransactions = [];
@@ -290,8 +290,8 @@ const Dashboard = () => {
 
           // Split trans_date_trans_time if it exists
           const transDateTime = cleanFields[0] || '';
-          const [trans_date, trans_time] = transDateTime.includes(' ') 
-            ? transDateTime.split(' ') 
+          const [trans_date, trans_time] = transDateTime.includes(' ')
+            ? transDateTime.split(' ')
             : [cleanFields[0], ''];
 
           // Map CSV columns to transaction object
@@ -356,7 +356,7 @@ const Dashboard = () => {
         });
 
         toast.showSuccess(`Successfully imported ${imported} transactions (${savedCount} saved to database)`, 4000);
-        
+
         // Refresh database transactions to show newly imported data
         fetchDatabaseTransactions();
       } catch (error) {
@@ -370,7 +370,7 @@ const Dashboard = () => {
     };
 
     reader.readAsText(file);
-    
+
     // Reset input so the same file can be selected again
     event.target.value = '';
   };
@@ -388,10 +388,10 @@ const Dashboard = () => {
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-gray-50">
       <Sidebar />
-      
+
       <div className="flex-1 flex flex-col overflow-hidden">
         <Header />
-        
+
         <main className="flex-1 overflow-y-auto">
           <div className="p-6 space-y-6">
             {/* Page Title with Action Buttons */}
@@ -411,7 +411,7 @@ const Dashboard = () => {
                   <RefreshCw className={`w-4 h-4 ${isLoadingTransactions ? 'animate-spin' : ''}`} />
                   Refresh
                 </Button>
-                
+
                 {/* Import CSV Button */}
                 <label htmlFor="csv-import">
                   <input
@@ -443,8 +443,8 @@ const Dashboard = () => {
                   <div>
                     <h3 className="text-lg font-bold text-gray-900">External Hackathon Stream</h3>
                     <p className="text-sm text-gray-600">
-                      {isMonitoring 
-                        ? `Connected to ${streamConfig.url}` 
+                      {isMonitoring
+                        ? `Connected to ${streamConfig.url}`
                         : 'Connect to receive live transactions from the hackathon server'}
                     </p>
                   </div>
@@ -505,7 +505,10 @@ const Dashboard = () => {
               />
               <AnalyticsCard
                 title="Fraud Detected"
-                value={dbTransactions.filter(t => t.isFraud).length.toLocaleString()}
+                value={dbTransactions
+                  .filter(t => String(t.status ?? '').toLowerCase() === 'blocked')
+                  .length
+                  .toLocaleString()}
                 icon={AlertTriangle}
                 color="danger"
                 tooltip="Fraudulent transactions flagged by AI/ML system based on risk patterns."
@@ -524,7 +527,7 @@ const Dashboard = () => {
             </div>
 
             {/* Transaction List - Most Recent First */}
-            <TransactionList 
+            <TransactionList
               transactions={[
                 // Merge database transactions with live stream transactions
                 ...dbTransactions.map(t => ({
@@ -552,9 +555,9 @@ const Dashboard = () => {
                   timestamp: t.timestamp || Math.floor(Date.now() / 1000)
                 }))
               ]
-              // Sort by timestamp (most recent first) and take first 5
-              .sort((a, b) => b.timestamp - a.timestamp)
-              .slice(0, 5)}
+                // Sort by timestamp (most recent first) and take first 5
+                .sort((a, b) => b.timestamp - a.timestamp)
+                .slice(0, 5)}
               maxRows={5}
               showExport={true}
               showViewMore={true}
