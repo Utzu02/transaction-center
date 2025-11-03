@@ -66,20 +66,28 @@ jobs:
         env:
           FRONTEND_URL: ${{ steps.deploy_frontend.outputs.frontend_url }}
           BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS }}
         run: |
           set -e
           echo "Frontend URL: $FRONTEND_URL"
           echo "Backend URL: $BACKEND_URL"
           # Wait a few seconds for the deployments to warm up
           sleep 5
+          # If a Vercel protection bypass token is provided, append it to requests
+          SUFFIX=""
+          if [ -n "$VERCEL_BYPASS" ]; then
+            SUFFIX="?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=$VERCEL_BYPASS"
+            echo "Using Vercel bypass token for smoke tests"
+          fi
+
           echo "Checking backend /api/health"
-          curl -sS "$BACKEND_URL/api/health" | jq || true
-          echo "Checking backend /api/transactions?limit=2"
-          curl -sS "$BACKEND_URL/api/transactions?limit=2" | jq || true
-          echo "Testing POST /api/predict"
-          curl -sS -X POST -H 'Content-Type: application/json' -d '{"amount":"1200"}' "$BACKEND_URL/api/predict" | jq || true
-          echo "Checking frontend root status code"
-          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$FRONTEND_URL" || true)
+          curl -sS "$BACKEND_URL/api/health$SUFFIX" || true
+          echo "\nChecking backend /api/transactions?limit=2"
+          curl -sS "$BACKEND_URL/api/transactions?limit=2$SUFFIX" || true
+          echo "\nTesting POST /api/predict"
+          curl -sS -X POST -H 'Content-Type: application/json' -d '{"amount":"1200"}' "$BACKEND_URL/api/predict$SUFFIX" || true
+          echo "\nChecking frontend root status code"
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$FRONTEND_URL$SUFFIX" || true)
           echo "Frontend HTTP status: $HTTP_CODE"
 
       - name: Output deployed URLs
