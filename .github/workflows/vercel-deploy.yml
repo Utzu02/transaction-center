@@ -32,21 +32,29 @@ jobs:
           BACKEND_URL=$(grep -Eo 'https://[A-Za-z0-9-]+[A-Za-z0-9.-]*\.vercel\.app' vercel_backend_out.txt | head -n1 || true)
           echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
 
-      - name: Deploy frontend to Vercel (with backend URL)
+      - name: Build frontend locally (CI)
+        id: build_frontend
+        working-directory: frontend
+        env:
+          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+        run: |
+          set -e
+          echo "Using backend URL for build: $BACKEND_URL"
+          # install all deps (including devDependencies) and build with the backend URL
+          npm ci
+          # export the Vite env var for the build
+          export VITE_API_BASE_URL="$BACKEND_URL"
+          npm run build
+
+      - name: Deploy built frontend (dist/) to Vercel
         id: deploy_frontend
         working-directory: frontend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
         run: |
           set -e
-          echo "Using backend URL: $BACKEND_URL"
-          # Ensure devDependencies (vite) are installed during build by disabling npm production mode
-          # Pass the backend URL into the frontend build as VITE_API_BASE_URL
-          vercel --prod --token "$VERCEL_TOKEN" --confirm \
-            --build-env NPM_CONFIG_PRODUCTION=false \
-            --build-env VITE_API_BASE_URL="$BACKEND_URL" \
-            --env VITE_API_BASE_URL="$BACKEND_URL" > vercel_frontend_out.txt || true
+          # Deploy the already-built static output to Vercel to avoid running 'vite build' on Vercel
+          vercel --prod --token "$VERCEL_TOKEN" --confirm dist > vercel_frontend_out.txt || true
           cat vercel_frontend_out.txt
           FRONTEND_URL=$(grep -Eo 'https://[A-Za-z0-9-]+[A-Za-z0-9.-]*\.vercel\.app' vercel_frontend_out.txt | head -n1 || true)
           echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
