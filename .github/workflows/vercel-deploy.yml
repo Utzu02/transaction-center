@@ -26,34 +26,44 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -e
-          # Use JSON output to reliably capture the production URL
-          vercel --prod --token "$VERCEL_TOKEN" --confirm --json > vercel_backend_out.json || true
-          cat vercel_backend_out.json
-          # JSON may be an array; try to parse the first object's url or .url field
-          BACKEND_URL=$(jq -r 'if type=="array" then (.[0].url // .[0].inspectUrl // .[0].url) else .url end' vercel_backend_out.json || true)
-          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          # Deploy and capture raw CLI output (avoid --json which may not be supported in some CLI versions)
+          OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm 2>&1 || true)
+          echo "$OUT" > vercel_backend_out.txt
+          echo "--- vercel backend output (tail) ---"
+          tail -n 200 vercel_backend_out.txt || true
+          # Try to extract the deployment URL (first vercel.app URL in output)
+          DEPLOY_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+          echo "deploy_url=$DEPLOY_URL"
+          # If we couldn't extract a URL, leave it empty (alias step will handle fallback)
+          echo "backend_deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "BACKEND_DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_ENV
 
-      - name: Alias backend deployment to stable subdomain (optional)
+      - name: Alias backend deployment to your stable domain
         if: always()
         working-directory: backend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          BACKEND_URL: "https://backend-self-xi-87.vercel.app/"
+          DEPLOY_URL: ${{ steps.deploy_backend.outputs.backend_deploy_url }}
         run: |
           set -e
-          # Choose a stable alias under your Vercel team. Change if you prefer another name.
-          ALIAS_NAME="api-transaction-center.utzus-projects.vercel.app"
-          echo "Attempting to alias $BACKEND_URL -> $ALIAS_NAME"
-          # Try to alias; if it fails, continue and keep using the original BACKEND_URL
-          if vercel alias "$BACKEND_URL" "$ALIAS_NAME" --token "$VERCEL_TOKEN" --yes; then
-            echo "Alias succeeded: $ALIAS_NAME"
-            echo "backend_url=$ALIAS_NAME" >> $GITHUB_OUTPUT
-            echo "BACKEND_URL=$ALIAS_NAME" >> $GITHUB_ENV
+          # Use the stable domain that you control for this project (from your Dashboard)
+          STABLE_DOMAIN="backend-self-xi-87.vercel.app"
+          echo "Stable domain to use: $STABLE_DOMAIN"
+          # If we have a deployment URL, attempt to alias it to the stable domain.
+          if [ -n "$DEPLOY_URL" ]; then
+            echo "Attempting to alias $DEPLOY_URL -> $STABLE_DOMAIN"
+            # Do not use unsupported flags; if alias fails, continue and still use the stable domain
+            if vercel alias "$DEPLOY_URL" "$STABLE_DOMAIN" --token "$VERCEL_TOKEN" 2>&1; then
+              echo "Alias succeeded: $STABLE_DOMAIN"
+            else
+              echo "Alias command failed (ok if alias already exists or permission denied)." 
+            fi
           else
-            echo "Alias failed or not allowed; keeping original backend URL: $BACKEND_URL"
-            echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
-            echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+            echo "No deploy URL found from CLI output; skipping alias command."
           fi
+          # Regardless of alias result, set BACKEND_URL to the stable domain so the workflow uses it
+          echo "backend_url=https://$STABLE_DOMAIN" >> $GITHUB_OUTPUT
+          echo "BACKEND_URL=https://$STABLE_DOMAIN" >> $GITHUB_ENV
 
       - name: Build frontend locally (CI)
         id: build_frontend
