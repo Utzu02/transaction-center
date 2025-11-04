@@ -12,6 +12,20 @@ class NotificationService:
     """Service class for notification operations"""
     
     @staticmethod
+    def _safe_get_db():
+        """
+        Attempt to get a database connection, returning a structured error if it fails.
+        Useful for serverless environments where MongoDB might be unavailable.
+        """
+        try:
+            return get_db(), None
+        except Exception as exc:
+            return None, {
+                'success': False,
+                'error': f'Database connection error: {exc}'
+            }
+    
+    @staticmethod
     def add_notification(notification_data):
         """
         Add a new notification to the database
@@ -31,7 +45,9 @@ class NotificationService:
         if not is_valid:
             return {'success': False, 'error': error}
         
-        db = get_db()
+        db, error = NotificationService._safe_get_db()
+        if error:
+            return error
         
         # Prepare notification document
         notification = {
@@ -69,7 +85,9 @@ class NotificationService:
         Returns:
             dict: Result with notifications list and count
         """
-        db = get_db()
+        db, error = NotificationService._safe_get_db()
+        if error:
+            return error
         
         try:
             # Build query
@@ -125,7 +143,9 @@ class NotificationService:
         if not is_valid:
             return {'success': False, 'error': obj_id}
         
-        db = get_db()
+        db, error = NotificationService._safe_get_db()
+        if error:
+            return error
         
         try:
             notification = db.notifications.find_one({'_id': obj_id})
@@ -161,7 +181,9 @@ class NotificationService:
         if not is_valid:
             return {'success': False, 'error': obj_id}
         
-        db = get_db()
+        db, error = NotificationService._safe_get_db()
+        if error:
+            return error
         
         try:
             result = db.notifications.update_one(
@@ -192,7 +214,9 @@ class NotificationService:
         if not is_valid:
             return {'success': False, 'error': obj_id}
         
-        db = get_db()
+        db, error = NotificationService._safe_get_db()
+        if error:
+            return error
         
         try:
             result = db.notifications.delete_one({'_id': obj_id})
@@ -212,7 +236,9 @@ class NotificationService:
         Returns:
             dict: Result with success status and count of deleted notifications
         """
-        db = get_db()
+        db, error = NotificationService._safe_get_db()
+        if error:
+            return error
         
         try:
             result = db.notifications.delete_many({})
@@ -231,7 +257,9 @@ class NotificationService:
         Returns:
             dict: Result with success status and count of modified notifications
         """
-        db = get_db()
+        db, error = NotificationService._safe_get_db()
+        if error:
+            return error
         
         try:
             result = db.notifications.update_many(
@@ -244,4 +272,3 @@ class NotificationService:
             }
         except Exception as e:
             return {'success': False, 'error': str(e)}
-
