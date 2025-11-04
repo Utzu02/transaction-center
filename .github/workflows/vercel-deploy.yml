@@ -43,7 +43,7 @@ jobs:
         working-directory: backend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DEPLOY_URL: ${{ steps.deploy_backend.outputs.backend_deploy_url }}
+          DEPLOY_URL: "https://backend-self-xi-87.vercel.app/"
         run: |
           set -e
           # Use the stable domain that you control for this project (from your Dashboard)
