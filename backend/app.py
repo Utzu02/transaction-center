@@ -6,13 +6,10 @@ Flask server with MongoDB integration
 from flask import Flask, jsonify
 from flask_cors import CORS
 import sys
-import importlib
 
 from config import config
-# Note: do NOT import Database or route blueprints at module import time.
-# Import them lazily inside create_app() to avoid import-time failures in
-# serverless environments where optional dependencies (or network services)
-# may be unavailable during module import.
+from utils.database import Database
+from routes import transaction_bp, notification_bp
 
 def create_app():
     """Create and configure the Flask application"""
@@ -26,18 +23,9 @@ def create_app():
     # Configure app
     app.config['JSON_SORT_KEYS'] = False
     
-    # Register blueprints (import lazily so missing optional deps don't break import)
-    try:
-        # routes is a package that exposes transaction_bp and notification_bp
-        routes = importlib.import_module('routes')
-        if hasattr(routes, 'transaction_bp'):
-            app.register_blueprint(routes.transaction_bp)
-        if hasattr(routes, 'notification_bp'):
-            app.register_blueprint(routes.notification_bp)
-    except Exception as e:
-        # Log and continue — endpoints requiring DB or services may error later,
-        # but the app will import successfully and Vercel can route requests.
-        print(f"⚠️  Could not import/register blueprints: {e}")
+    # Register blueprints
+    app.register_blueprint(transaction_bp)
+    app.register_blueprint(notification_bp)
     
     # Health check endpoint
     @app.route('/api/health', methods=['GET'])
@@ -45,8 +33,6 @@ def create_app():
         """Health check endpoint"""
         try:
             # Test database connection
-            # Import Database lazily to avoid import-time dependency on pymongo
-            from utils.database import Database
             db = Database.get_db()
             db.command('ping')
             db_status = 'connected'
@@ -101,9 +87,6 @@ def main():
     
     # Connect to database
     try:
-        # Import Database lazily — connecting is only necessary when running
-        # the app directly (not in serverless import-time)
-        from utils.database import Database
         Database.connect()
     except Exception as e:
         print(f"❌ Database connection failed: {e}")
@@ -143,27 +126,9 @@ def main():
         print(f"\n❌ Server error: {e}")
     finally:
         # Close database connection
-        try:
-            from utils.database import Database
-            Database.close()
-        except Exception:
-            pass
+        Database.close()
         print("👋 Goodbye!")
 
 if __name__ == '__main__':
     main()
-
-# Expose a module-level WSGI app for serverless platforms (Vercel / WSGI loaders)
-# This ensures the deployed entrypoint has an `app` callable that imports will use.
-try:
-    # create_app is lightweight and only registers blueprints; safe to call at import
-    app = create_app()
-except Exception as _e:
-    # If creation fails (missing env/db), fall back to a minimal Flask app to give
-    # a clearer error rather than crashing the import in the serverless runtime.
-    fallback_app = Flask(__name__)
-    @fallback_app.route('/', methods=['GET'])
-    def _err():
-        return {'error': 'Application failed to initialize'}, 500
-    app = fallback_app
 
