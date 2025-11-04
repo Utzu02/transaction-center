@@ -118,6 +118,7 @@ def get_transactions():
         mock_transactions = [t for t in mock_transactions if t['status'] == status]
     
     return jsonify({
+        'success': True,
         'transactions': mock_transactions[offset:offset+limit],
         'total': len(mock_transactions),
         'limit': limit,
