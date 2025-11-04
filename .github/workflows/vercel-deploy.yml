@@ -43,7 +43,7 @@ jobs:
         working-directory: backend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          DEPLOY_URL: "https://backend-self-xi-87.vercel.app/"
+          DEPLOY_URL: ${{ steps.deploy_backend.outputs.backend_deploy_url }}
         run: |
           set -e
           # Use the stable domain that you control for this project (from your Dashboard)
@@ -87,11 +87,15 @@ jobs:
         run: |
           set -e
           # Deploy the already-built static output to Vercel to avoid running 'vite build' on Vercel
-          # Also pass BACK_URL and VITE_API_BASE_URL so the frontend deployment receives the backend URL
-          vercel --prod --token "$VERCEL_TOKEN" --confirm --json --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist > vercel_frontend_out.json || true
-          cat vercel_frontend_out.json
-          FRONTEND_URL=$(jq -r 'if type=="array" then (.[0].url // .[0].inspectUrl // .[0].url) else .url end' vercel_frontend_out.json || true)
+          # Capture raw CLI output (some vercel CLI versions don't support --json reliably)
+          OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist 2>&1 || true)
+          echo "$OUT" > vercel_frontend_out.txt
+          echo "--- vercel frontend output (tail) ---"
+          tail -n 200 vercel_frontend_out.txt || true
+          # Try to extract the deployment URL (first vercel.app URL in output)
+          FRONTEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
           echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+          echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
 
       - name: Install jq for tests
         run: sudo apt-get update && sudo apt-get install -y jq
