@@ -26,11 +26,34 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -e
-          vercel --prod --token "$VERCEL_TOKEN" --confirm > vercel_backend_out.txt || true
-          cat vercel_backend_out.txt
-          # Extract the first .vercel.app URL
-          BACKEND_URL=$(grep -Eo 'https://[A-Za-z0-9-]+[A-Za-z0-9.-]*\.vercel\.app' vercel_backend_out.txt | head -n1 || true)
+          # Use JSON output to reliably capture the production URL
+          vercel --prod --token "$VERCEL_TOKEN" --confirm --json > vercel_backend_out.json || true
+          cat vercel_backend_out.json
+          # JSON may be an array; try to parse the first object's url or .url field
+          BACKEND_URL=$(jq -r 'if type=="array" then (.[0].url // .[0].inspectUrl // .[0].url) else .url end' vercel_backend_out.json || true)
           echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+
+      - name: Alias backend deployment to stable subdomain (optional)
+        if: always()
+        working-directory: backend
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+        run: |
+          set -e
+          # Choose a stable alias under your Vercel team. Change if you prefer another name.
+          ALIAS_NAME="api-transaction-center.utzus-projects.vercel.app"
+          echo "Attempting to alias $BACKEND_URL -> $ALIAS_NAME"
+          # Try to alias; if it fails, continue and keep using the original BACKEND_URL
+          if vercel alias "$BACKEND_URL" "$ALIAS_NAME" --token "$VERCEL_TOKEN" --yes; then
+            echo "Alias succeeded: $ALIAS_NAME"
+            echo "backend_url=$ALIAS_NAME" >> $GITHUB_OUTPUT
+            echo "BACKEND_URL=$ALIAS_NAME" >> $GITHUB_ENV
+          else
+            echo "Alias failed or not allowed; keeping original backend URL: $BACKEND_URL"
+            echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+            echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+          fi
 
       - name: Build frontend locally (CI)
         id: build_frontend
@@ -55,9 +78,9 @@ jobs:
           set -e
           # Deploy the already-built static output to Vercel to avoid running 'vite build' on Vercel
           # Also pass BACK_URL and VITE_API_BASE_URL so the frontend deployment receives the backend URL
-          vercel --prod --token "$VERCEL_TOKEN" --confirm --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist > vercel_frontend_out.txt || true
-          cat vercel_frontend_out.txt
-          FRONTEND_URL=$(grep -Eo 'https://[A-Za-z0-9-]+[A-Za-z0-9.-]*\.vercel\.app' vercel_frontend_out.txt | head -n1 || true)
+          vercel --prod --token "$VERCEL_TOKEN" --confirm --json --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist > vercel_frontend_out.json || true
+          cat vercel_frontend_out.json
+          FRONTEND_URL=$(jq -r 'if type=="array" then (.[0].url // .[0].inspectUrl // .[0].url) else .url end' vercel_frontend_out.json || true)
           echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
 
       - name: Install jq for tests
