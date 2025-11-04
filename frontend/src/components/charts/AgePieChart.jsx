@@ -1,4 +1,5 @@
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { formatPercent } from '../../utils/formatters';
 
 const AgePieChart = ({ data = [], height = 250 }) => {
   const total = data.reduce((sum, item) => sum + item.value, 0);
@@ -14,7 +15,7 @@ const AgePieChart = ({ data = [], height = 250 }) => {
           <p className="text-sm text-gray-600">{dataPoint.value} fraud cases</p>
           {total > 0 && (
             <p className="text-xs text-gray-500 mt-1">
-              {((dataPoint.value / total) * 100).toFixed(1)}% of total fraud
+              {formatPercent(dataPoint.value / total, 1)} of total fraud
             </p>
           )}
         </div>
@@ -39,7 +40,7 @@ const AgePieChart = ({ data = [], height = 250 }) => {
           cx="50%"
           cy="50%"
           labelLine={false}
-          label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+          label={({ percent }) => formatPercent(percent, 0)}
           outerRadius={outerRadius}
           fill="#8884d8"
           dataKey="value"

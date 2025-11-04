@@ -93,12 +93,12 @@ const AlertsTimeline = ({ transactions = [] }) => {
     setTimelineData(intervals);
 
     // Calculate stats
-    const total = fraudTransactions.length;
-    const peak = Math.max(...intervals.map(i => i.count), 0);
-    const avg = intervals.length > 0 ? (total / intervals.length).toFixed(1) : 0;
-    const current = intervals[intervals.length - 1]?.count || 0;
+  const total = fraudTransactions.length;
+  const peak = Math.max(...intervals.map(i => i.count), 0);
+  const avg = intervals.length > 0 ? Number((total / intervals.length).toFixed(1)) : 0;
+  const current = intervals[intervals.length - 1]?.count || 0;
 
-    setStats({ total, peak, avg: parseFloat(avg), current });
+  setStats({ total, peak, avg, current });
   }, [transactions, timeframe]);
 
   const getTrend = () => {

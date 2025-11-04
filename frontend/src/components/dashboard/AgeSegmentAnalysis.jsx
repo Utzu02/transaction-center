@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Users, AlertCircle } from 'lucide-react';
 import Card from '../common/Card';
 import AgePieChart from '../charts/AgePieChart';
+import { formatPercent } from '../../utils/formatters';
 
 const AgeSegmentAnalysis = ({ transactions = [] }) => {
   const [chartData, setChartData] = useState([]);
@@ -120,9 +121,9 @@ const AgeSegmentAnalysis = ({ transactions = [] }) => {
                   <p className="text-sm text-gray-700 mt-1">
                     <span className="font-semibold">{stats.mostVulnerable.fraudCount}</span> fraud cases
                     {stats.total > 0 && (
-                      <span className="text-gray-600">
-                        {' '}• {((stats.mostVulnerable.fraudCount / stats.total) * 100).toFixed(1)}% of total
-                      </span>
+                          <span className="text-gray-600">
+                            {' '}• {formatPercent(stats.mostVulnerable.fraudCount / stats.total, 1)} of total
+                          </span>
                     )}
                   </p>
                 </div>

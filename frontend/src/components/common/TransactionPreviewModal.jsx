@@ -1,12 +1,13 @@
 import { X, MapPin, Calendar, Clock, DollarSign, CreditCard, User, Building, AlertTriangle, CheckCircle, Shield } from 'lucide-react';
 import Badge from './Badge';
+import { formatCurrency, formatPercent, formatSeconds } from '../../utils/formatters';
 
 const TransactionPreviewModal = ({ isOpen, onClose, transaction }) => {
   if (!isOpen || !transaction) return null;
 
   // Consistent fraud detection: check is_fraud, isFraud, OR status === 'blocked' or 'unknown'
   const isFraud = transaction.isFraud || transaction.is_fraud || transaction.status === 'blocked' || transaction.status === 'unknown';
-  const amount = parseFloat(transaction.amount || transaction.amt || 0) || 0;
+  const amount = transaction.amt ?? transaction.amount ?? 0;
   const transNum = transaction.trans_num || transaction.id;
 
   const formatDate = (date) => {
@@ -73,15 +74,13 @@ const TransactionPreviewModal = ({ isOpen, onClose, transaction }) => {
                 <DollarSign className="w-6 h-6" />
                 <div>
                   <p className="text-xs opacity-90">Transaction Amount</p>
-                  <p className="text-3xl font-bold">${amount.toFixed(2)}</p>
+                  <p className="text-3xl font-bold">{formatCurrency(amount)}</p>
                 </div>
               </div>
               {transaction.fraud_probability !== undefined && transaction.fraud_probability !== null && (
                 <div className="text-right bg-white/20 rounded-lg p-2">
                   <p className="text-xs opacity-90">Fraud Risk</p>
-                  <p className="text-xl font-bold">
-                    {(parseFloat(transaction.fraud_probability) * 100).toFixed(1)}%
-                  </p>
+                  <p className="text-xl font-bold">{formatPercent(transaction.fraud_probability, 1)}</p>
                 </div>
               )}
             </div>
@@ -234,13 +233,13 @@ const TransactionPreviewModal = ({ isOpen, onClose, transaction }) => {
                 {transaction.fraud_probability !== undefined && transaction.fraud_probability !== null && (
                   <div className="bg-white rounded-lg p-2">
                     <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">Fraud Probability</p>
-                    <p className="text-xl text-red-600 font-bold mt-0.5">{(parseFloat(transaction.fraud_probability) * 100).toFixed(2)}%</p>
+                    <p className="text-xl text-red-600 font-bold mt-0.5">{formatPercent(transaction.fraud_probability, 2)}</p>
                   </div>
                 )}
                 {transaction.confidence !== undefined && transaction.confidence !== null && (
                   <div className="bg-white rounded-lg p-2">
                     <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">Confidence</p>
-                    <p className="text-xl text-orange-600 font-bold mt-0.5">{(parseFloat(transaction.confidence) * 100).toFixed(1)}%</p>
+                    <p className="text-xl text-orange-600 font-bold mt-0.5">{formatPercent(transaction.confidence, 1)}</p>
                   </div>
                 )}
                 {transaction.pattern && (
@@ -258,7 +257,7 @@ const TransactionPreviewModal = ({ isOpen, onClose, transaction }) => {
                 {transaction.processing_time !== undefined && transaction.processing_time !== null && (
                   <div className="bg-white rounded-lg p-2">
                     <p className="text-xs text-gray-600 font-medium uppercase tracking-wide">Processing</p>
-                    <p className="text-sm text-gray-900 font-bold mt-0.5">{parseFloat(transaction.processing_time).toFixed(3)}s</p>
+                    <p className="text-sm text-gray-900 font-bold mt-0.5">{formatSeconds(transaction.processing_time, 3)}</p>
                   </div>
                 )}
               </div>

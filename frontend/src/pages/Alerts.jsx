@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatCurrency } from '../utils/formatters';
 import { AlertTriangle, CheckCircle, Clock, XCircle, RefreshCw } from 'lucide-react';
 import Sidebar from '../components/dashboard/Sidebar';
 import Header from '../components/dashboard/Header';
@@ -39,7 +40,7 @@ const Alerts = () => {
           severity: notif.type || 'medium',
           time: formatTime(notif.timestamp || notif.created_at),
           transactionId: notif.transaction_id || 'N/A',
-          amount: notif.amount ? `$${notif.amount.toFixed(2)}` : 'N/A',
+          amount: notif.amount ? formatCurrency(notif.amount) : 'N/A',
           read: notif.read || false
         }));
         

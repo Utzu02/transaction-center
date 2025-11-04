@@ -11,6 +11,7 @@ import sseService from '../services/sse';
 import websocketService from '../services/websocket';
 import apiService from '../services/api';
 import { formatTransaction } from '../utils/fraudDetection';
+import { formatCurrency, formatPercent, toNumber } from '../utils/formatters';
 import { BarChart, Bar, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Legend } from 'recharts';
 
 const Analytics = () => {
@@ -112,7 +113,7 @@ const Analytics = () => {
           processed: newProcessed,
           fraudDetected: newFraudDetected,
           reported: newFraudDetected,
-          detectionRate: newProcessed > 0 ? ((newFraudDetected / newProcessed) * 100).toFixed(1) : '0'
+          detectionRate: newProcessed > 0 ? Number(((newFraudDetected / newProcessed) * 100).toFixed(1)) : 0
         };
       });
     };
@@ -184,10 +185,10 @@ const Analytics = () => {
 
   // Calculate real metrics from transactions
   const metrics = [
-    {
+      {
       title: 'Average Transaction Value',
       value: dbTransactions.length > 0
-        ? `$${(dbTransactions.reduce((sum, t) => sum + (parseFloat(t.amt || t.amount || 0)), 0) / dbTransactions.length).toFixed(2)}`
+        ? formatCurrency(dbTransactions.reduce((sum, t) => sum + (parseFloat(t.amt || t.amount || 0)), 0) / dbTransactions.length)
         : '$0.00',
       icon: DollarSign,
       color: 'primary'
@@ -207,7 +208,7 @@ const Analytics = () => {
     {
       title: 'Fraud Rate',
       value: dbTransactions.length > 0
-        ? `${((dbTransactions.filter(t => t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown').length / dbTransactions.length) * 100).toFixed(1)}%`
+        ? formatPercent(dbTransactions.filter(t => t.is_fraud || t.isFraud || t.status === 'blocked' || t.status === 'unknown').length / dbTransactions.length, 1)
         : '0%',
       icon: Activity,
       color: 'danger'
@@ -361,7 +362,7 @@ const Analytics = () => {
                           label={({ name, count, percent }) => {
                             // Only show label if percentage is > 5%
                             if (percent < 0.05) return '';
-                            return `${name}\n${count} (${(percent * 100).toFixed(1)}%)`;
+                            return `${name}\n${count} (${formatPercent(percent, 1)})`;
                           }}
                           outerRadius={100}
                           fill="#8884d8"
@@ -379,10 +380,13 @@ const Analytics = () => {
                             borderRadius: '12px',
                             boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
                           }}
-                          formatter={(value, name, props) => [
-                            `${value} transactions (${((value / riskDistribution.reduce((sum, item) => sum + item.value, 0)) * 100).toFixed(1)}%)`,
-                            props.payload.name
-                          ]}
+                          formatter={(value, name, props) => {
+                            const total = riskDistribution.reduce((sum, item) => sum + item.value, 0) || 1;
+                            return [
+                              `${value} transactions (${formatPercent(value / total, 1)})`,
+                              props.payload.name
+                            ];
+                          }}
                         />
                         <Legend
                           verticalAlign="bottom"

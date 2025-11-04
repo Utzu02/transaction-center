@@ -9,6 +9,7 @@ import RangeFilterDropdown from '../components/common/RangeFilterDropdown';
 import Button from '../components/common/Button';
 import { useToast } from '../components/common/ToastContainer';
 import apiService from '../services/api';
+import { formatCurrency } from '../utils/formatters';
 
 const Transactions = () => {
   const toast = useToast();
@@ -148,7 +149,7 @@ const Transactions = () => {
         const formatted = response.transactions.map(tx => ({
           ...tx,  // Keep ALL original backend fields
           id: tx.trans_num || tx.id,
-          amount: tx.amt ? `$${tx.amt.toFixed(2)}` : '$0.00',
+          amount: tx.amt !== undefined && tx.amt !== null ? formatCurrency(tx.amt) : formatCurrency(tx.amount),
           riskScore: tx.risk_score || 0,
           date: tx.trans_date && tx.trans_time ? `${tx.trans_date} ${tx.trans_time}` : tx.created_at,
           customer: tx.first && tx.last ? `${tx.first} ${tx.last}` : '',

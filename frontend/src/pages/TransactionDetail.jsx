@@ -8,6 +8,7 @@ import Button from '../components/common/Button';
 import Badge from '../components/common/Badge';
 import { useToast } from '../components/common/ToastContainer';
 import apiService from '../services/api';
+import { formatCurrency } from '../utils/formatters';
 
 const TransactionDetail = () => {
   const { id } = useParams();
@@ -30,7 +31,7 @@ const TransactionDetail = () => {
             id: tx.trans_num || tx.id,
             merchant: tx.merchant || 'Unknown',
             merchantCategory: tx.category || 'Unknown',
-            amount: tx.amt ? `$${tx.amt.toFixed(2)}` : '$0.00',
+            amount: tx.amt !== undefined && tx.amt !== null ? formatCurrency(tx.amt) : formatCurrency(tx.amount),
             status: tx.status || 'accepted',
             riskScore: tx.risk_score || 0,
             date: tx.trans_date && tx.trans_time ? `${tx.trans_date} ${tx.trans_time}` : tx.created_at,

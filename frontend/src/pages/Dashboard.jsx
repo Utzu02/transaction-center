@@ -13,6 +13,7 @@ import websocketService from '../services/websocket';
 import sseService from '../services/sse';
 import apiService from '../services/api';
 import { formatTransaction } from '../utils/fraudDetection';
+import { formatCurrency, formatPercent } from '../utils/formatters';
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -202,8 +203,8 @@ const Dashboard = () => {
           processed: newProcessed,
           fraudDetected: newFraudDetected,
           reported: newFraudDetected, // In hackathon, we report all detected fraud
-          detectionRate: newProcessed > 0 ? ((newFraudDetected / newProcessed) * 100).toFixed(1) : '0',
-          avgResponseTime: ((prev.avgResponseTime * (newProcessed - 1) + responseTime) / newProcessed).toFixed(2)
+          detectionRate: newProcessed > 0 ? Number(((newFraudDetected / newProcessed) * 100).toFixed(1)) : 0,
+          avgResponseTime: Number(((prev.avgResponseTime * (newProcessed - 1) + responseTime) / newProcessed).toFixed(2))
         };
       });
 
@@ -213,7 +214,7 @@ const Dashboard = () => {
         const now = Date.now();
         if (now - lastNotificationRef.current > 3000) {
           toast.showWarning(
-            `Fraud Detected: $${formattedTransaction.amount.toFixed(2)} - ${formattedTransaction.pattern}`,
+            `Fraud Detected: ${formatCurrency(formattedTransaction.amount)} - ${formattedTransaction.pattern}`,
             4000
           );
           lastNotificationRef.current = now;
@@ -340,12 +341,12 @@ const Dashboard = () => {
           const newFraudDetected = prev.fraudDetected + fraudCount;
 
           return {
-            ...prev,
-            processed: newProcessed,
-            fraudDetected: newFraudDetected,
-            reported: newFraudDetected,
-            detectionRate: newProcessed > 0 ? ((newFraudDetected / newProcessed) * 100).toFixed(1) : '0'
-          };
+              ...prev,
+              processed: newProcessed,
+              fraudDetected: newFraudDetected,
+              reported: newFraudDetected,
+              detectionRate: newProcessed > 0 ? Number(((newFraudDetected / newProcessed) * 100).toFixed(1)) : 0
+            };
         });
 
         toast.showSuccess(`Successfully imported ${imported} transactions (${savedCount} saved to database)`, 4000);
@@ -508,11 +509,11 @@ const Dashboard = () => {
               />
               <AnalyticsCard
                 title="Detection Rate"
-                value={`${(() => {
+                value={(() => {
                   const totalTx = dbTransactions.length;
                   const totalFraud = dbTransactions.filter(t => t.isFraud).length;
-                  return totalTx > 0 ? ((totalFraud / totalTx) * 100).toFixed(1) : "0";
-                })()}%`}
+                  return totalTx > 0 ? formatPercent(totalFraud / totalTx, 1) : '0%';
+                })()}
                 icon={TrendingUp}
                 color="success"
                 tooltip="Percentage of transactions identified as fraud. Target: high accuracy, low false positives."
@@ -521,13 +522,13 @@ const Dashboard = () => {
 
             {/* Transaction List - Most Recent First */}
             <TransactionList
-              transactions={[
+                transactions={[
                 // Merge database transactions with live stream transactions
                 ...dbTransactions.map(t => ({
                   id: t.id,
                   customer: t.customer,
                   merchant: t.merchant,
-                  amount: `$${t.amount.toFixed(2)}`,
+                  amount: formatCurrency(t.amount),
                   category: t.category,
                   location: t.location,
                   riskScore: t.riskScore,
@@ -539,7 +540,7 @@ const Dashboard = () => {
                   id: t.id,
                   customer: t.customer,
                   merchant: t.merchant,
-                  amount: `$${t.amount.toFixed(2)}`,
+                  amount: formatCurrency(t.amount),
                   category: t.category,
                   location: t.location,
                   riskScore: t.riskScore,

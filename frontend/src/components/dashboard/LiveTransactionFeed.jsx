@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 import Card from '../common/Card';
 import Badge from '../common/Badge';
+import { toNumber } from '../../utils/formatters';
 
 const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
   const feedRef = useRef(null);
@@ -102,7 +103,16 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
                       <CheckCircle className="w-5 h-5 text-green-600" />
                     )}
                     <span className="font-semibold text-gray-900">
-                      ${(transaction.amount || transaction.amt || 0).toFixed(2)}
+                      {/* Coerce amount to a number safely (handles strings like "$123.45") */}
+                      {(() => {
+                        const rawAmt = transaction.amt ?? transaction.amount ?? 0;
+                        // If amount is a string like "$123.45" strip non-numeric chars
+                        const num = typeof rawAmt === 'string'
+                          ? parseFloat(rawAmt.replace(/[^0-9.-]+/g, ''))
+                          : Number(rawAmt);
+                        const safeNum = Number.isFinite(num) ? num : 0;
+                        return `$${safeNum.toFixed(2)}`;
+                      })()}
                     </span>
                     <Badge variant={getStatusColor(transaction)}>
                       {(transaction.isFraud || transaction.is_fraud || transaction.status === 'blocked' || transaction.status === 'unknown') ? 'FRAUD' : getRiskLevel(transaction.riskScore || 0)}
@@ -120,8 +130,11 @@ const LiveTransactionFeed = ({ transactions = [], onFlag }) => {
                     <div className="flex items-center gap-3 text-xs text-gray-600">
                       <span>📍 {transaction.location || transaction.city || 'Unknown'}</span>
                       <span>🏷️ {transaction.category || 'N/A'}</span>
-                      {transaction.distance && (
-                        <span>📏 {transaction.distance.toFixed(0)}km from home</span>
+                      {transaction.distance != null && (
+                        <span>📏 {(() => {
+                          const num = toNumber(transaction.distance, null);
+                          return num !== null ? `${Math.round(num)}km from home` : 'N/A';
+                        })()}</span>
                       )}
                     </div>
                   </div>
