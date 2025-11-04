@@ -26,17 +26,158 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -e
-          # Use JSON output to reliably capture the production URL
-          vercel --prod --token "$VERCEL_TOKEN" --confirm --json > vercel_backend_out.json || true
-          cat vercel_backend_out.json
-          # JSON may be an array; try to parse the first object's url or .url field
-          BACKEND_URL=$(jq -r 'if type=="array" then (.[0].url // .[0].inspectUrl // .[0].url) else .url end' vercel_backend_out.json || true)
-          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+          # Capture full CLI output and extract the deployed URL (avoid --json which may not be supported)
+          OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm 2>&1 || true)
+          echo "$OUT" > vercel_backend_out.txt
+          echo "--- vercel backend output (tail) ---"
+          tail -n 200 vercel_backend_out.txt
+          # Try to find a vercel.app url first, else any https:// URL in the output
+          BACKEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+          if [ -z "$BACKEND_URL" ]; then
+            BACKEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+' | head -n1 || true)
+          name: Deploy frontend & backend to Vercel
 
-      - name: Alias backend deployment to stable subdomain (optional)
-        if: always()
-        working-directory: backend
-        env:
+          on:
+            push:
+              branches: [ main ]
+
+          jobs:
+            deploy:
+              runs-on: ubuntu-latest
+              steps:
+                - name: Checkout
+                  uses: actions/checkout@v4
+
+                - name: Setup Node.js
+                  uses: actions/setup-node@v4
+                  with:
+                    node-version: '18'
+
+                - name: Install Vercel CLI
+                  run: npm ci -g vercel@latest || npm i -g vercel@latest
+
+                - name: Deploy backend to Vercel
+                  id: deploy_backend
+                  working-directory: backend
+                  env:
+                    VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                  run: |
+                    set -e
+                    # Capture full CLI output and extract the deployed URL (avoid --json which may not be supported)
+                    OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm 2>&1 || true)
+                    echo "$OUT" > vercel_backend_out.txt
+                    echo "--- vercel backend output (tail) ---"
+                    tail -n 200 vercel_backend_out.txt
+                    # Try to find a vercel.app url first, else any https:// URL in the output
+                    BACKEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+                    if [ -z "$BACKEND_URL" ]; then
+                      BACKEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+' | head -n1 || true)
+                    fi
+                    echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+                    echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+
+                - name: Alias backend deployment to stable subdomain (optional)
+                  if: always()
+                  working-directory: backend
+                  env:
+                    VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                    BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+                  run: |
+                    set -e
+                    ALIAS_NAME="api-transaction-center.utzus-projects.vercel.app"
+                    echo "Attempting to alias $BACKEND_URL -> $ALIAS_NAME"
+                    if [ -n "$BACKEND_URL" ]; then
+                      # Use the CLI without unsupported flags; if alias fails, continue and keep original URL
+                      if vercel alias "$BACKEND_URL" "$ALIAS_NAME" --token "$VERCEL_TOKEN" 2>&1; then
+                        echo "Alias succeeded: $ALIAS_NAME"
+                        echo "backend_url=$ALIAS_NAME" >> $GITHUB_OUTPUT
+                        echo "BACKEND_URL=$ALIAS_NAME" >> $GITHUB_ENV
+                      else
+                        echo "Alias failed or not allowed; keeping original backend URL: $BACKEND_URL"
+                        echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+                        echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+                      fi
+                    else
+                      echo "No BACKEND_URL found; skipping alias step"
+                      echo "backend_url=" >> $GITHUB_OUTPUT
+                    fi
+
+                - name: Build frontend locally (CI)
+                  id: build_frontend
+                  working-directory: frontend
+                  env:
+                    BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+                  run: |
+                    set -e
+                    echo "Using backend URL for build: $BACKEND_URL"
+                    # install all deps (including devDependencies) and build with the backend URL
+                    npm ci
+                    # export the Vite env var for the build
+                    export VITE_API_BASE_URL="$BACKEND_URL"
+                    npm run build
+
+                - name: Deploy built frontend (dist/) to Vercel
+                  id: deploy_frontend
+                  working-directory: frontend
+                  env:
+                    VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                    BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+                  run: |
+                    set -e
+                    OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist 2>&1 || true)
+                    echo "$OUT" > vercel_frontend_out.txt
+                    echo "--- vercel frontend output (tail) ---"
+                    tail -n 200 vercel_frontend_out.txt
+                    FRONTEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+                    if [ -z "$FRONTEND_URL" ]; then
+                      FRONTEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+' | head -n1 || true)
+                    fi
+                    echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+                    echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
+
+                - name: Install jq for tests
+                  run: sudo apt-get update && sudo apt-get install -y jq
+
+                - name: Smoke tests (backend + frontend)
+                  env:
+                    FRONTEND_URL: ${{ steps.deploy_frontend.outputs.frontend_url }}
+                    BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+                    VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS }}
+                  run: |
+                    set -e
+                    echo "Frontend URL: $FRONTEND_URL"
+                    echo "Backend URL: $BACKEND_URL"
+                    # Wait a few seconds for the deployments to warm up
+                    sleep 5
+                    SUFFIX=""
+                    if [ -n "$VERCEL_BYPASS" ]; then
+                      SUFFIX="?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=$VERCEL_BYPASS"
+                      echo "Using Vercel bypass token for smoke tests"
+                    fi
+
+                    if [ -n "$BACKEND_URL" ]; then
+                      echo "Checking backend /api/health"
+                      curl -sS "$BACKEND_URL/api/health$SUFFIX" || true
+                      echo "\nChecking backend /api/transactions?limit=2"
+                      curl -sS "$BACKEND_URL/api/transactions?limit=2$SUFFIX" || true
+                      echo "\nTesting POST /api/predict"
+                      curl -sS -X POST -H 'Content-Type: application/json' -d '{"amount":"1200"}' "$BACKEND_URL/api/predict$SUFFIX" || true
+                    else
+                      echo "No BACKEND_URL provided; skipping backend smoke tests"
+                    fi
+
+                    if [ -n "$FRONTEND_URL" ]; then
+                      echo "\nChecking frontend root status code"
+                      HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$FRONTEND_URL$SUFFIX" || true)
+                      echo "Frontend HTTP status: $HTTP_CODE"
+                    else
+                      echo "No FRONTEND_URL provided; skipping frontend smoke test"
+                    fi
+
+                - name: Output deployed URLs
+                  run: |
+                    echo "Backend URL: ${{ steps.deploy_backend.outputs.backend_url }}"
+                    echo "Frontend URL: ${{ steps.deploy_frontend.outputs.frontend_url }}"
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
           BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
         run: |
@@ -69,52 +210,227 @@ jobs:
           export VITE_API_BASE_URL="$BACKEND_URL"
           npm run build
 
-      - name: Deploy built frontend (dist/) to Vercel
-        id: deploy_frontend
-        working-directory: frontend
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-        run: |
-          set -e
-          # Deploy the already-built static output to Vercel to avoid running 'vite build' on Vercel
-          # Also pass BACK_URL and VITE_API_BASE_URL so the frontend deployment receives the backend URL
-          vercel --prod --token "$VERCEL_TOKEN" --confirm --json --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist > vercel_frontend_out.json || true
-          cat vercel_frontend_out.json
-          FRONTEND_URL=$(jq -r 'if type=="array" then (.[0].url // .[0].inspectUrl // .[0].url) else .url end' vercel_frontend_out.json || true)
-          echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+      name: Deploy frontend & backend to Vercel
 
-      - name: Install jq for tests
-        run: sudo apt-get update && sudo apt-get install -y jq
+      on:
+        push:
+          branches: [ main ]
 
-      - name: Smoke tests (backend + frontend)
-        env:
-          FRONTEND_URL: ${{ steps.deploy_frontend.outputs.frontend_url }}
-          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
-          VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS }}
-        run: |
-          set -e
-          echo "Frontend URL: $FRONTEND_URL"
-          echo "Backend URL: $BACKEND_URL"
-          # Wait a few seconds for the deployments to warm up
-          sleep 5
-          # If a Vercel protection bypass token is provided, append it to requests
-          SUFFIX=""
-          if [ -n "$VERCEL_BYPASS" ]; then
-            SUFFIX="?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=$VERCEL_BYPASS"
-            echo "Using Vercel bypass token for smoke tests"
-          fi
+      jobs:
+        deploy:
+          runs-on: ubuntu-latest
+          steps:
+            - name: Checkout
+              uses: actions/checkout@v4
 
-          echo "Checking backend /api/health"
-          curl -sS "$BACKEND_URL/api/health$SUFFIX" || true
-          echo "\nChecking backend /api/transactions?limit=2"
-          curl -sS "$BACKEND_URL/api/transactions?limit=2$SUFFIX" || true
-          echo "\nTesting POST /api/predict"
-          curl -sS -X POST -H 'Content-Type: application/json' -d '{"amount":"1200"}' "$BACKEND_URL/api/predict$SUFFIX" || true
-          echo "\nChecking frontend root status code"
-          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$FRONTEND_URL$SUFFIX" || true)
-          echo "Frontend HTTP status: $HTTP_CODE"
+            - name: Setup Node.js
+              uses: actions/setup-node@v4
+              with:
+                node-version: '18'
 
-      - name: Output deployed URLs
-        run: |
-          echo "Backend URL: ${{ steps.deploy_backend.outputs.backend_url }}"
-          echo "Frontend URL: ${{ steps.deploy_frontend.outputs.frontend_url }}"
+            - name: Install Vercel CLI
+              run: npm ci -g vercel@latest || npm i -g vercel@latest
+
+            - name: Deploy backend to Vercel
+              id: deploy_backend
+              working-directory: backend
+              env:
+                VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+              run: |
+                set -e
+                # Capture full CLI output and extract the deployed URL (avoid --json which may not be supported)
+                OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm 2>&1 || true)
+                echo "$OUT" > vercel_backend_out.txt
+                echo "--- vercel backend output (tail) ---"
+                tail -n 200 vercel_backend_out.txt
+                # Try to find a vercel.app url first, else any https:// URL in the output
+                BACKEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+                if [ -z "$BACKEND_URL" ]; then
+                  BACKEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+' | head -n1 || true)
+                fi
+                echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+                echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+
+            - name: Alias backend deployment to stable subdomain (optional)
+              if: always()
+              working-directory: backend
+              env:
+                VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+              run: |
+                set -e
+                ALIAS_NAME="api-transaction-center.utzus-projects.vercel.app"
+                echo "Attempting to alias $BACKEND_URL -> $ALIAS_NAME"
+                if [ -n "$BACKEND_URL" ]; then
+                  # Use the CLI without unsupported flags; if alias fails, continue and keep original URL
+                  if vercel alias "$BACKEND_URL" "$ALIAS_NAME" --token "$VERCEL_TOKEN" 2>&1; then
+                    echo "Alias succeeded: $ALIAS_NAME"
+                    echo "backend_url=$ALIAS_NAME" >> $GITHUB_OUTPUT
+                    echo "BACKEND_URL=$ALIAS_NAME" >> $GITHUB_ENV
+                  else
+                    echo "Alias failed or not allowed; keeping original backend URL: $BACKEND_URL"
+                    echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+                    echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+                  fi
+                else
+                  echo "No BACKEND_URL found; skipping alias step"
+                  echo "backend_url=" >> $GITHUB_OUTPUT
+                fi
+
+            - name: Build frontend locally (CI)
+              id: build_frontend
+              working-directory: frontend
+              env:
+                BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+              run: |
+                set -e
+                echo "Using backend URL for build: $BACKEND_URL"
+                # install all deps (including devDependencies) and build with the backend URL
+                npm ci
+                # export the Vite env var for the build
+                export VITE_API_BASE_URL="$BACKEND_URL"
+                npm run build
+
+            name: Deploy frontend & backend to Vercel
+
+            on:
+              push:
+                branches: [ main ]
+
+            jobs:
+              deploy:
+                runs-on: ubuntu-latest
+                steps:
+                  - name: Checkout
+                    uses: actions/checkout@v4
+
+                  - name: Setup Node.js
+                    uses: actions/setup-node@v4
+                    with:
+                      node-version: '18'
+
+                  - name: Install Vercel CLI
+                    run: npm ci -g vercel@latest || npm i -g vercel@latest
+
+                  - name: Deploy backend to Vercel
+                    id: deploy_backend
+                    working-directory: backend
+                    env:
+                      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                    run: |
+                      set -e
+                      # Capture full CLI output and extract the deployed URL (avoid --json which may not be supported)
+                      OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm 2>&1 || true)
+                      echo "$OUT" > vercel_backend_out.txt
+                      echo "--- vercel backend output (tail) ---"
+                      tail -n 200 vercel_backend_out.txt
+                      # Try to find a vercel.app url first, else any https:// URL in the output
+                      BACKEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+                      if [ -z "$BACKEND_URL" ]; then
+                        BACKEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+' | head -n1 || true)
+                      fi
+                      echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+                      echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+
+                  - name: Alias backend deployment to stable subdomain (optional)
+                    if: always()
+                    working-directory: backend
+                    env:
+                      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                      BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+                    run: |
+                      set -e
+                      ALIAS_NAME="api-transaction-center.utzus-projects.vercel.app"
+                      echo "Attempting to alias $BACKEND_URL -> $ALIAS_NAME"
+                      if [ -n "$BACKEND_URL" ]; then
+                        # Use the CLI without unsupported flags; if alias fails, continue and keep original URL
+                        if vercel alias "$BACKEND_URL" "$ALIAS_NAME" --token "$VERCEL_TOKEN" 2>&1; then
+                          echo "Alias succeeded: $ALIAS_NAME"
+                          echo "backend_url=$ALIAS_NAME" >> $GITHUB_OUTPUT
+                          echo "BACKEND_URL=$ALIAS_NAME" >> $GITHUB_ENV
+                        else
+                          echo "Alias failed or not allowed; keeping original backend URL: $BACKEND_URL"
+                          echo "backend_url=$BACKEND_URL" >> $GITHUB_OUTPUT
+                          echo "BACKEND_URL=$BACKEND_URL" >> $GITHUB_ENV
+                        fi
+                      else
+                        echo "No BACKEND_URL found; skipping alias step"
+                        echo "backend_url=" >> $GITHUB_OUTPUT
+                      fi
+
+                  - name: Build frontend locally (CI)
+                    id: build_frontend
+                    working-directory: frontend
+                    env:
+                      BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+                    run: |
+                      set -e
+                      echo "Using backend URL for build: $BACKEND_URL"
+                      # install all deps (including devDependencies) and build with the backend URL
+                      npm ci
+                      # export the Vite env var for the build
+                      export VITE_API_BASE_URL="$BACKEND_URL"
+                      npm run build
+
+                  - name: Deploy built frontend (dist/) to Vercel
+                    id: deploy_frontend
+                    working-directory: frontend
+                    env:
+                      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+                      BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+                    run: |
+                      set -e
+                      OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist 2>&1 || true)
+                      echo "$OUT" > vercel_frontend_out.txt
+                      echo "--- vercel frontend output (tail) ---"
+                      tail -n 200 vercel_frontend_out.txt
+                      FRONTEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+                      if [ -z "$FRONTEND_URL" ]; then
+                        FRONTEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+' | head -n1 || true)
+                      fi
+                      echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
+                      echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
+
+                  - name: Install jq for tests
+                    run: sudo apt-get update && sudo apt-get install -y jq
+
+                  - name: Smoke tests (backend + frontend)
+                    env:
+                      FRONTEND_URL: ${{ steps.deploy_frontend.outputs.frontend_url }}
+                      BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+                      VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS }}
+                    run: |
+                      set -e
+                      echo "Frontend URL: $FRONTEND_URL"
+                      echo "Backend URL: $BACKEND_URL"
+                      # Wait a few seconds for the deployments to warm up
+                      sleep 5
+                      SUFFIX=""
+                      if [ -n "$VERCEL_BYPASS" ]; then
+                        SUFFIX="?x-vercel-set-bypass-cookie=true&x-vercel-protection-bypass=$VERCEL_BYPASS"
+                        echo "Using Vercel bypass token for smoke tests"
+                      fi
+
+                      if [ -n "$BACKEND_URL" ]; then
+                        echo "Checking backend /api/health"
+                        curl -sS "$BACKEND_URL/api/health$SUFFIX" || true
+                        echo "\nChecking backend /api/transactions?limit=2"
+                        curl -sS "$BACKEND_URL/api/transactions?limit=2$SUFFIX" || true
+                        echo "\nTesting POST /api/predict"
+                        curl -sS -X POST -H 'Content-Type: application/json' -d '{"amount":"1200"}' "$BACKEND_URL/api/predict$SUFFIX" || true
+                      else
+                        echo "No BACKEND_URL provided; skipping backend smoke tests"
+                      fi
+
+                      if [ -n "$FRONTEND_URL" ]; then
+                        echo "\nChecking frontend root status code"
+                        HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$FRONTEND_URL$SUFFIX" || true)
+                        echo "Frontend HTTP status: $HTTP_CODE"
+                      else
+                        echo "No FRONTEND_URL provided; skipping frontend smoke test"
+                      fi
+
+                  - name: Output deployed URLs
+                    run: |
+                      echo "Backend URL: ${{ steps.deploy_backend.outputs.backend_url }}"
+                      echo "Frontend URL: ${{ steps.deploy_frontend.outputs.frontend_url }}"
