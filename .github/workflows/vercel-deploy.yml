@@ -54,7 +54,8 @@ jobs:
         run: |
           set -e
           # Deploy the already-built static output to Vercel to avoid running 'vite build' on Vercel
-          vercel --prod --token "$VERCEL_TOKEN" --confirm dist > vercel_frontend_out.txt || true
+          # Also pass BACK_URL and VITE_API_BASE_URL so the frontend deployment receives the backend URL
+          vercel --prod --token "$VERCEL_TOKEN" --confirm --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist > vercel_frontend_out.txt || true
           cat vercel_frontend_out.txt
           FRONTEND_URL=$(grep -Eo 'https://[A-Za-z0-9-]+[A-Za-z0-9.-]*\.vercel\.app' vercel_frontend_out.txt | head -n1 || true)
           echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
