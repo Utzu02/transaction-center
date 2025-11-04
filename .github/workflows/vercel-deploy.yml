@@ -38,7 +38,7 @@ jobs:
         working-directory: backend
         env:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+          BACKEND_URL: "https://backend-self-xi-87.vercel.app/"
         run: |
           set -e
           # Choose a stable alias under your Vercel team. Change if you prefer another name.
@@ -59,7 +59,7 @@ jobs:
         id: build_frontend
         working-directory: frontend
         env:
-          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+          BACKEND_URL: "https://backend-self-xi-87.vercel.app/"
         run: |
           set -e
           echo "Using backend URL for build: $BACKEND_URL"
@@ -88,8 +88,8 @@ jobs:
 
       - name: Smoke tests (backend + frontend)
         env:
-          FRONTEND_URL: ${{ steps.deploy_frontend.outputs.frontend_url }}
-          BACKEND_URL: ${{ steps.deploy_backend.outputs.backend_url }}
+          FRONTEND_URL: "https://frontend-cyan-six-47.vercel.app/"
+          BACKEND_URL: "https://backend-self-xi-87.vercel.app/"
           VERCEL_BYPASS: ${{ secrets.VERCEL_BYPASS }}
         run: |
           set -e
@@ -116,5 +116,5 @@ jobs:
 
       - name: Output deployed URLs
         run: |
-          echo "Backend URL: ${{ steps.deploy_backend.outputs.backend_url }}"
-          echo "Frontend URL: ${{ steps.deploy_frontend.outputs.frontend_url }}"
+          echo "Backend URL: https://backend-self-xi-87.vercel.app/"
+          echo "Frontend URL: https://frontend-cyan-six-47.vercel.app/"
