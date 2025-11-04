@@ -3,10 +3,40 @@ Notification Service
 Handles all notification-related business logic
 """
 
+import uuid
 from datetime import datetime
 from bson import ObjectId
 from utils.database import get_db
 from utils.validators import validate_notification, validate_object_id
+
+# Lightweight fallback notifications used when the database is unavailable
+FALLBACK_NOTIFICATIONS = [
+    {
+        'id': 'fallback-1',
+        '_id': 'fallback-1',
+        'title': 'Notification service in demo mode',
+        'message': 'Backend database is not connected. Showing sample notifications.',
+        'text': 'Backend database is not connected. Showing sample notifications.',
+        'type': 'info',
+        'read': False,
+        'timestamp': datetime.utcnow().isoformat(),
+        'created_at': datetime.utcnow().isoformat()
+    },
+    {
+        'id': 'fallback-2',
+        '_id': 'fallback-2',
+        'title': 'Connect MongoDB for live alerts',
+        'message': 'To enable real notifications, configure MONGODB_URI on the backend.',
+        'text': 'To enable real notifications, configure MONGODB_URI on the backend.',
+        'type': 'warning',
+        'read': False,
+        'timestamp': datetime.utcnow().isoformat(),
+        'created_at': datetime.utcnow().isoformat()
+    }
+]
+
+# Temporary in-memory notification store used when MongoDB is unavailable
+IN_MEMORY_NOTIFICATIONS = []
 
 class NotificationService:
     """Service class for notification operations"""
@@ -22,7 +52,8 @@ class NotificationService:
         except Exception as exc:
             return None, {
                 'success': False,
-                'error': f'Database connection error: {exc}'
+                'error': f'Database connection error: {exc}',
+                'code': 'database_unavailable'
             }
     
     @staticmethod
@@ -47,7 +78,29 @@ class NotificationService:
         
         db, error = NotificationService._safe_get_db()
         if error:
-            return error
+            # Store notification in transient memory for demo deployments
+            fallback_id = f"fallback-{uuid.uuid4().hex}"
+            timestamp = datetime.utcnow().isoformat()
+            notification = {
+                'id': fallback_id,
+                '_id': fallback_id,
+                'message': notification_data.get('message') or notification_data.get('text'),
+                'text': notification_data.get('text') or notification_data.get('message'),
+                'type': notification_data['type'],
+                'title': notification_data.get('title'),
+                'transaction_id': notification_data.get('transaction_id'),
+                'read': False,
+                'timestamp': timestamp,
+                'created_at': timestamp,
+                'fallback': True
+            }
+            IN_MEMORY_NOTIFICATIONS.insert(0, notification)
+            return {
+                'success': True,
+                'notification_id': fallback_id,
+                'fallback': True,
+                'warning': error['error']
+            }
         
         # Prepare notification document
         notification = {
@@ -87,7 +140,30 @@ class NotificationService:
         """
         db, error = NotificationService._safe_get_db()
         if error:
-            return error
+            # Serve fallback notifications so the UI keeps working in demo deployments
+            notifications = []
+            for source in (FALLBACK_NOTIFICATIONS + IN_MEMORY_NOTIFICATIONS):
+                # Refresh timestamps so they look recent to the UI
+                refreshed_time = datetime.utcnow().isoformat()
+                notifications.append({
+                    **source,
+                    'timestamp': refreshed_time,
+                    'created_at': refreshed_time
+                })
+            # Apply pagination to the fallback set
+            paginated = notifications[skip:skip + limit]
+            unread_count = len([n for n in paginated if not n.get('read', False)])
+            
+            return {
+                'success': True,
+                'notifications': paginated,
+                'total': len(notifications),
+                'unread': unread_count,
+                'limit': limit,
+                'skip': skip,
+                'fallback': True,
+                'warning': error['error']
+            }
         
         try:
             # Build query
@@ -138,6 +214,18 @@ class NotificationService:
         Returns:
             dict: Result with notification data or error
         """
+        # Allow fallback notifications without a MongoDB ObjectId
+        if notification_id.startswith('fallback-'):
+            fallback = next((n for n in (IN_MEMORY_NOTIFICATIONS + FALLBACK_NOTIFICATIONS) if n['id'] == notification_id or n.get('_id') == notification_id), None)
+            if fallback:
+                refreshed_time = datetime.utcnow().isoformat()
+                notification = {
+                    **fallback,
+                    'timestamp': refreshed_time,
+                    'created_at': refreshed_time
+                }
+                return {'success': True, 'notification': notification, 'fallback': True}
+        
         # Validate ID
         is_valid, obj_id = validate_object_id(notification_id)
         if not is_valid:
@@ -145,6 +233,15 @@ class NotificationService:
         
         db, error = NotificationService._safe_get_db()
         if error:
+            fallback = next((n for n in (IN_MEMORY_NOTIFICATIONS + FALLBACK_NOTIFICATIONS) if n['id'] == notification_id or n['_id'] == notification_id), None)
+            if fallback:
+                refreshed_time = datetime.utcnow().isoformat()
+                notification = {
+                    **fallback,
+                    'timestamp': refreshed_time,
+                    'created_at': refreshed_time
+                }
+                return {'success': True, 'notification': notification, 'fallback': True}
             return error
         
         try:
@@ -183,6 +280,19 @@ class NotificationService:
         
         db, error = NotificationService._safe_get_db()
         if error:
+            updated = False
+            for notif in IN_MEMORY_NOTIFICATIONS:
+                if notif['id'] == notification_id or notif['_id'] == notification_id:
+                    notif['read'] = True
+                    notif['timestamp'] = datetime.utcnow().isoformat()
+                    updated = True
+                    break
+            if not updated:
+                # Treat static fallback notifications as read to avoid UI errors
+                if any(n['id'] == notification_id or n.get('_id') == notification_id for n in FALLBACK_NOTIFICATIONS):
+                    updated = True
+            if updated:
+                return {'success': True, 'fallback': True}
             return error
         
         try:
@@ -216,6 +326,15 @@ class NotificationService:
         
         db, error = NotificationService._safe_get_db()
         if error:
+            initial_len = len(IN_MEMORY_NOTIFICATIONS)
+            IN_MEMORY_NOTIFICATIONS[:] = [
+                notif for notif in IN_MEMORY_NOTIFICATIONS
+                if not (notif['id'] == notification_id or notif['_id'] == notification_id)
+            ]
+            if len(IN_MEMORY_NOTIFICATIONS) < initial_len:
+                return {'success': True, 'fallback': True}
+            if any(n['id'] == notification_id or n.get('_id') == notification_id for n in FALLBACK_NOTIFICATIONS):
+                return {'success': True, 'fallback': True}
             return error
         
         try:
@@ -238,7 +357,9 @@ class NotificationService:
         """
         db, error = NotificationService._safe_get_db()
         if error:
-            return error
+            count = len(IN_MEMORY_NOTIFICATIONS)
+            IN_MEMORY_NOTIFICATIONS.clear()
+            return {'success': True, 'deleted_count': count, 'fallback': True}
         
         try:
             result = db.notifications.delete_many({})
@@ -259,7 +380,14 @@ class NotificationService:
         """
         db, error = NotificationService._safe_get_db()
         if error:
-            return error
+            for notif in IN_MEMORY_NOTIFICATIONS:
+                notif['read'] = True
+                notif['timestamp'] = datetime.utcnow().isoformat()
+            for notif in FALLBACK_NOTIFICATIONS:
+                notif['read'] = True
+                notif['timestamp'] = datetime.utcnow().isoformat()
+                notif['created_at'] = notif.get('created_at') or notif['timestamp']
+            return {'success': True, 'fallback': True}
         
         try:
             result = db.notifications.update_many(

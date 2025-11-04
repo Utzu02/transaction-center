@@ -31,7 +31,8 @@ def get_notifications():
     )
     
     if not result['success']:
-        return jsonify({'error': result['error']}), 500
+        status_code = 503 if result.get('code') == 'database_unavailable' else 500
+        return jsonify({'error': result['error']}), status_code
     
     return jsonify(result), 200
 
@@ -41,7 +42,8 @@ def get_notification(notification_id):
     result = NotificationService.get_notification_by_id(notification_id)
     
     if not result['success']:
-        return jsonify({'error': result['error']}), 404
+        status_code = 503 if result.get('code') == 'database_unavailable' else 404
+        return jsonify({'error': result['error']}), status_code
     
     return jsonify(result['notification']), 200
 
@@ -56,7 +58,8 @@ def add_notification():
     result = NotificationService.add_notification(data)
     
     if not result['success']:
-        return jsonify({'error': result['error']}), 400
+        status_code = 503 if result.get('code') == 'database_unavailable' else 400
+        return jsonify({'error': result['error']}), status_code
     
     return jsonify(result), 201
 
@@ -66,7 +69,8 @@ def mark_notification_as_read(notification_id):
     result = NotificationService.mark_as_read(notification_id)
     
     if not result['success']:
-        return jsonify({'error': result['error']}), 404
+        status_code = 503 if result.get('code') == 'database_unavailable' else 404
+        return jsonify({'error': result['error']}), status_code
     
     return jsonify(result), 200
 
@@ -76,7 +80,8 @@ def delete_notification(notification_id):
     result = NotificationService.delete_notification(notification_id)
     
     if not result['success']:
-        return jsonify({'error': result['error']}), 404
+        status_code = 503 if result.get('code') == 'database_unavailable' else 404
+        return jsonify({'error': result['error']}), status_code
     
     return jsonify(result), 200
 
@@ -87,7 +92,8 @@ def delete_all_notifications():
     result = NotificationService.delete_all_notifications()
     
     if not result['success']:
-        return jsonify({'error': result['error']}), 500
+        status_code = 503 if result.get('code') == 'database_unavailable' else 500
+        return jsonify({'error': result['error']}), status_code
     
     return jsonify(result), 200
 
@@ -97,7 +103,7 @@ def mark_all_as_read():
     result = NotificationService.mark_all_as_read()
     
     if not result['success']:
-        return jsonify({'error': result['error']}), 500
+        status_code = 503 if result.get('code') == 'database_unavailable' else 500
+        return jsonify({'error': result['error']}), status_code
     
     return jsonify(result), 200
-

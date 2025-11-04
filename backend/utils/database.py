@@ -3,8 +3,15 @@ Database utility module
 Handles MongoDB connection and provides database instance
 """
 
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+try:
+    from pymongo import MongoClient
+    from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
+    _IMPORT_ERROR = None
+except Exception as import_error:
+    MongoClient = None
+    ConnectionFailure = ServerSelectionTimeoutError = Exception  # type: ignore
+    _IMPORT_ERROR = import_error
+
 from config import config
 
 class Database:
@@ -16,6 +23,9 @@ class Database:
     @classmethod
     def connect(cls):
         """Establish connection to MongoDB"""
+        if MongoClient is None:
+            raise RuntimeError(f"pymongo is not available: {_IMPORT_ERROR}")
+        
         try:
             cls._client = MongoClient(
                 config.MONGODB_URI,
@@ -86,4 +96,3 @@ class Database:
 def get_db():
     """Get database instance"""
     return Database.get_db()
-
