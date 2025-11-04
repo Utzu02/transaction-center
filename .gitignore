@@ -1,0 +1,16 @@
+# Runtime artifacts
+backend.log
+backend.pid
+
+# Virtual env
+.venv/
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Environment
+.env
+
+# Vercel
+.vercel
