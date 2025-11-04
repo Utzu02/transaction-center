@@ -170,21 +170,14 @@ const Dashboard = () => {
       // Backend will analyze, detect fraud, save to DB, and create alerts if needed
       const processTransaction = async () => {
         try {
-          const response = await fetch(`${apiService.baseUrl}/api/transactions/process`, {
+          const result = await apiService.request('/api/transactions/process', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(transaction)
+            body: JSON.stringify(transaction),
           });
+          console.log(`✅ Transaction processed: ${transaction.trans_num}`, result);
 
-          if (response.ok) {
-            const result = await response.json();
-            console.log(`✅ Transaction processed: ${transaction.trans_num}`, result);
-
-            // Refresh DB transactions to show the newly saved transaction
-            setTimeout(() => fetchDatabaseTransactions(), 500);
-          } else {
-            console.error(`❌ Failed to process transaction: ${response.status}`);
-          }
+          // Refresh DB transactions to show the newly saved transaction
+          setTimeout(() => fetchDatabaseTransactions(), 500);
         } catch (error) {
           console.error('❌ Error processing transaction:', error);
         }
@@ -570,4 +563,3 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
-

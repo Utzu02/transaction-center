@@ -1,9 +1,31 @@
 // API Service for Backend Communication
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5050';
+const resolveBaseUrl = () => {
+  const candidates = [
+    import.meta.env.BACK_URL,
+    import.meta.env.VITE_BACK_URL,
+    import.meta.env.VITE_API_BASE_URL,
+  ];
+
+  const configured = candidates.find((value) => Boolean(value && value.trim()));
+  const fallback = 'http://localhost:5050';
+
+  return (configured || fallback).replace(/\/$/, '');
+};
+
+const API_BASE_URL = resolveBaseUrl();
 
 class ApiService {
   constructor() {
     this.baseUrl = API_BASE_URL;
+  }
+
+  buildUrl(endpoint = '') {
+    if (!endpoint) {
+      return this.baseUrl;
+    }
+
+    const sanitizedEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return `${this.baseUrl}${sanitizedEndpoint}`;
   }
 
   // Helper to normalize transaction data
@@ -22,13 +44,13 @@ class ApiService {
 
   // Helper method for API calls
   async request(endpoint, options = {}) {
-    const url = `${this.baseUrl}${endpoint}`;
+    const url = this.buildUrl(endpoint);
     const config = {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
-      ...options,
     };
 
     try {
@@ -311,4 +333,3 @@ class ApiService {
 // Export singleton instance
 const apiService = new ApiService();
 export default apiService;
-
