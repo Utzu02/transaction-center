@@ -39,6 +39,7 @@ jobs:
           echo "BACKEND_DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_ENV
 
       - name: Alias backend deployment to your stable domain
+        id: alias_backend
         if: always()
         working-directory: backend
         env:
@@ -56,22 +57,38 @@ jobs:
             if vercel alias "$DEPLOY_URL" "$STABLE_DOMAIN" --token "$VERCEL_TOKEN" 2>&1; then
               echo "Alias succeeded: $STABLE_DOMAIN"
             else
-              echo "Alias command failed (ok if alias already exists or permission denied)." 
+              echo "Alias command failed (ok if alias already exists or permission denied)."
             fi
           else
             echo "No deploy URL found from CLI output; skipping alias command."
           fi
-          # Regardless of alias result, set BACKEND_URL to the stable domain so the workflow uses it
-          echo "backend_url=https://$STABLE_DOMAIN" >> $GITHUB_OUTPUT
-          echo "BACKEND_URL=https://$STABLE_DOMAIN" >> $GITHUB_ENV
+          # Verify the stable domain by checking /api/health; if it responds 2xx/3xx, use it.
+          HEALTH_URL="https://$STABLE_DOMAIN/api/health"
+          echo "Checking health at: $HEALTH_URL"
+          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
+          echo "Health HTTP status: $HTTP_CODE"
+          if echo "$HTTP_CODE" | grep -qE '^[23]..$'; then
+            FINAL_BACKEND_URL="https://$STABLE_DOMAIN"
+            echo "Stable domain responds; using stable domain: $FINAL_BACKEND_URL"
+          elif [ -n "$DEPLOY_URL" ]; then
+            FINAL_BACKEND_URL="$DEPLOY_URL"
+            echo "Stable domain did not respond OK; falling back to ephemeral deploy URL: $FINAL_BACKEND_URL"
+          else
+            FINAL_BACKEND_URL="https://$STABLE_DOMAIN"
+            echo "No deploy URL available; defaulting to stable domain: $FINAL_BACKEND_URL"
+          fi
+          echo "backend_url=$FINAL_BACKEND_URL" >> $GITHUB_OUTPUT
+          echo "BACKEND_URL=$FINAL_BACKEND_URL" >> $GITHUB_ENV
 
       - name: Build frontend locally (CI)
         id: build_frontend
         working-directory: frontend
         env:
-          BACKEND_URL: "https://backend-self-xi-87.vercel.app/"
+          BACKEND_URL: ${{ steps.alias_backend.outputs.backend_url }}
         run: |
           set -e
+          # ensure a default if BACKEND_URL empty
+          BACKEND_URL=${BACKEND_URL:-"https://backend-self-xi-87.vercel.app/"}
           echo "Using backend URL for build: $BACKEND_URL"
           # install all deps (including devDependencies) and build with the backend URL
           npm ci
@@ -96,6 +113,15 @@ jobs:
           FRONTEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
           echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
           echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
+
+      - name: Upload Vercel CLI outputs as artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vercel-cli-outputs
+          path: |
+            backend/vercel_backend_out.txt
+            frontend/vercel_frontend_out.txt
 
       - name: Install jq for tests
         run: sudo apt-get update && sudo apt-get install -y jq

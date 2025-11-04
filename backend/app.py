@@ -132,3 +132,17 @@ def main():
 if __name__ == '__main__':
     main()
 
+# Expose a module-level WSGI app for serverless platforms (Vercel / WSGI loaders)
+# This ensures the deployed entrypoint has an `app` callable that imports will use.
+try:
+    # create_app is lightweight and only registers blueprints; safe to call at import
+    app = create_app()
+except Exception as _e:
+    # If creation fails (missing env/db), fall back to a minimal Flask app to give
+    # a clearer error rather than crashing the import in the serverless runtime.
+    fallback_app = Flask(__name__)
+    @fallback_app.route('/', methods=['GET'])
+    def _err():
+        return {'error': 'Application failed to initialize'}, 500
+    app = fallback_app
+
