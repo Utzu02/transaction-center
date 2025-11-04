@@ -35,7 +35,11 @@ class Config:
     MODEL_PATH = os.getenv('MODEL_PATH', 'fraud_detector_model.pkl')
     
     # CORS Configuration
-    CORS_ORIGINS = os.getenv('CORS_ORIGINS', 'http://localhost:5173,http://localhost:3000,https://frontend-cyan-six-47.vercel.app,https://backend-self-xi-87.vercel.app/').split(',')
+    # Allow specifying multiple origins as a comma-separated env var. Normalize
+    # each origin by stripping whitespace and any trailing slash to avoid exact
+    # mismatch issues when browsers send the Origin header.
+    _raw_origins = os.getenv('CORS_ORIGINS', 'http://localhost:5173,http://localhost:3000,https://frontend-cyan-six-47.vercel.app,https://backend-self-xi-87.vercel.app/')
+    CORS_ORIGINS = [o.strip().rstrip('/') for o in _raw_origins.split(',') if o.strip()]
     
     @classmethod
     def validate(cls):

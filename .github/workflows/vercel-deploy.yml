@@ -26,20 +26,40 @@ jobs:
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           set -e
-          # Deploy and capture raw CLI output (avoid --json which may not be supported in some CLI versions)
-          OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm 2>&1 || true)
-          echo "$OUT" > vercel_backend_out.txt
-          echo "--- vercel backend output (tail) ---"
-          tail -n 200 vercel_backend_out.txt || true
-          # Try to extract the deployment URL (first vercel.app URL in output)
-          DEPLOY_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+          # Deploy with JSON output and save to file. Use Python to parse the JSON
+          # so we don't depend on `jq` being preinstalled in the runner.
+          vercel --prod --token "$VERCEL_TOKEN" --confirm --json > vercel_backend_out.json 2>&1 || true
+          echo "--- vercel backend raw output ---"
+          tail -n 200 vercel_backend_out.json || true
+
+          # Try to parse the URL from the JSON output
+          DEPLOY_URL=$(
+            python3 - <<'PY'
+import json,sys
+try:
+    j=json.load(open('vercel_backend_out.json'))
+    if isinstance(j, list) and len(j)>0:
+        print(j[0].get('url',''))
+    elif isinstance(j, dict):
+        print(j.get('url',''))
+    else:
+        print('')
+except Exception:
+    print('')
+PY
+          )
+
+          # Fallback: try to grep for vercel.app URL if JSON parsing failed
+          if [ -z "$DEPLOY_URL" ]; then
+            OUT_TEXT=$(cat vercel_backend_out.json || true)
+            DEPLOY_URL=$(echo "$OUT_TEXT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+          fi
+
           echo "deploy_url=$DEPLOY_URL"
-          # If we couldn't extract a URL, leave it empty (alias step will handle fallback)
           echo "backend_deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
           echo "BACKEND_DEPLOY_URL=$DEPLOY_URL" >> $GITHUB_ENV
 
       - name: Alias backend deployment to your stable domain
-        id: alias_backend
         if: always()
         working-directory: backend
         env:
@@ -57,38 +77,22 @@ jobs:
             if vercel alias "$DEPLOY_URL" "$STABLE_DOMAIN" --token "$VERCEL_TOKEN" 2>&1; then
               echo "Alias succeeded: $STABLE_DOMAIN"
             else
-              echo "Alias command failed (ok if alias already exists or permission denied)."
+              echo "Alias command failed (ok if alias already exists or permission denied)." 
             fi
           else
             echo "No deploy URL found from CLI output; skipping alias command."
           fi
-          # Verify the stable domain by checking /api/health; if it responds 2xx/3xx, use it.
-          HEALTH_URL="https://$STABLE_DOMAIN/api/health"
-          echo "Checking health at: $HEALTH_URL"
-          HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" "$HEALTH_URL" || true)
-          echo "Health HTTP status: $HTTP_CODE"
-          if echo "$HTTP_CODE" | grep -qE '^[23]..$'; then
-            FINAL_BACKEND_URL="https://$STABLE_DOMAIN"
-            echo "Stable domain responds; using stable domain: $FINAL_BACKEND_URL"
-          elif [ -n "$DEPLOY_URL" ]; then
-            FINAL_BACKEND_URL="$DEPLOY_URL"
-            echo "Stable domain did not respond OK; falling back to ephemeral deploy URL: $FINAL_BACKEND_URL"
-          else
-            FINAL_BACKEND_URL="https://$STABLE_DOMAIN"
-            echo "No deploy URL available; defaulting to stable domain: $FINAL_BACKEND_URL"
-          fi
-          echo "backend_url=$FINAL_BACKEND_URL" >> $GITHUB_OUTPUT
-          echo "BACKEND_URL=$FINAL_BACKEND_URL" >> $GITHUB_ENV
+          # Regardless of alias result, set BACKEND_URL to the stable domain so the workflow uses it
+          echo "backend_url=https://$STABLE_DOMAIN" >> $GITHUB_OUTPUT
+          echo "BACKEND_URL=https://$STABLE_DOMAIN" >> $GITHUB_ENV
 
       - name: Build frontend locally (CI)
         id: build_frontend
         working-directory: frontend
         env:
-          BACKEND_URL: ${{ steps.alias_backend.outputs.backend_url }}
+          BACKEND_URL: "https://backend-self-xi-87.vercel.app/"
         run: |
           set -e
-          # ensure a default if BACKEND_URL empty
-          BACKEND_URL=${BACKEND_URL:-"https://backend-self-xi-87.vercel.app/"}
           echo "Using backend URL for build: $BACKEND_URL"
           # install all deps (including devDependencies) and build with the backend URL
           npm ci
@@ -104,24 +108,11 @@ jobs:
         run: |
           set -e
           # Deploy the already-built static output to Vercel to avoid running 'vite build' on Vercel
-          # Capture raw CLI output (some vercel CLI versions don't support --json reliably)
-          OUT=$(vercel --prod --token "$VERCEL_TOKEN" --confirm --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist 2>&1 || true)
-          echo "$OUT" > vercel_frontend_out.txt
-          echo "--- vercel frontend output (tail) ---"
-          tail -n 200 vercel_frontend_out.txt || true
-          # Try to extract the deployment URL (first vercel.app URL in output)
-          FRONTEND_URL=$(echo "$OUT" | grep -oE 'https?://[^ ]+vercel.app' | head -n1 || true)
+          # Also pass BACK_URL and VITE_API_BASE_URL so the frontend deployment receives the backend URL
+          vercel --prod --token "$VERCEL_TOKEN" --confirm --json --env BACK_URL="$BACKEND_URL" --env VITE_API_BASE_URL="$BACKEND_URL" dist > vercel_frontend_out.json || true
+          cat vercel_frontend_out.json
+          FRONTEND_URL=$(jq -r 'if type=="array" then (.[0].url // .[0].inspectUrl // .[0].url) else .url end' vercel_frontend_out.json || true)
           echo "frontend_url=$FRONTEND_URL" >> $GITHUB_OUTPUT
-          echo "FRONTEND_URL=$FRONTEND_URL" >> $GITHUB_ENV
-
-      - name: Upload Vercel CLI outputs as artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: vercel-cli-outputs
-          path: |
-            backend/vercel_backend_out.txt
-            frontend/vercel_frontend_out.txt
 
       - name: Install jq for tests
         run: sudo apt-get update && sudo apt-get install -y jq

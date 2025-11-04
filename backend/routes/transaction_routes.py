@@ -5,9 +5,13 @@ Handles all transaction-related API endpoints
 
 from flask import Blueprint, request, jsonify
 from services.transaction_service import TransactionService
-import pandas as pd
-from fraud_detector import FraudDetector
 from math import radians, cos, sin, asin, sqrt
+
+# Avoid heavy imports at module import time (pandas, fraud_detector).
+# Import them lazily inside functions that need them so the app can start
+# in environments where those packages are not installed.
+pd = None
+FraudDetector = None
 
 transaction_bp = Blueprint('transactions', __name__, url_prefix='/api/transactions')
 
@@ -21,6 +25,15 @@ def get_fraud_detector():
     global _fraud_detector_cache
     if _fraud_detector_cache is None:
         print("🔧 Loading fraud detector model (first time)...")
+        # Lazy import of FraudDetector to avoid import-time failures
+        global FraudDetector
+        try:
+            if FraudDetector is None:
+                from fraud_detector import FraudDetector as _FD
+                FraudDetector = _FD
+        except Exception as e:
+            raise RuntimeError(f"Could not load fraud detector: {e}")
+
         _fraud_detector_cache = FraudDetector()
         _fraud_detector_cache.load_model('fraud_detector_model.pkl')
         
@@ -182,6 +195,18 @@ def process_transaction():
                     except (ValueError, TypeError):
                         pass  # Keep original if conversion fails
             
+            # Lazy import pandas for DataFrame creation
+            global pd
+            try:
+                if pd is None:
+                    import pandas as _pd
+                    pd = _pd
+            except Exception:
+                pd = None
+
+            if pd is None:
+                raise RuntimeError('pandas is required for fraud prediction in this route')
+
             # Create DataFrame for prediction
             df_trans = pd.DataFrame([data])
             
