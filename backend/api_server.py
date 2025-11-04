@@ -11,8 +11,15 @@ import importlib
 from datetime import datetime, timedelta
 import json
 
+from config import config
+from routes.notification_routes import notification_bp
+
 app = Flask(__name__)
-CORS(app)  # Enable CORS for frontend
+# Restrict CORS to configured origins (supports multiple comma-delimited values)
+CORS(app, origins=config.CORS_ORIGINS, supports_credentials=True)
+
+# Register notification routes so the frontend can access the full API surface.
+app.register_blueprint(notification_bp)
 
 # Global variables
 detector = None
@@ -320,4 +327,3 @@ if __name__ == '__main__':
     
     # Run server
     app.run(host='0.0.0.0', port=5000, debug=True)
-
