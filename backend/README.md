@@ -1,7 +1,7 @@
 # POS Fraud Detection System - Python Implementation
 
 This is a complete Python implementation of the MATLAB anomaly detection code, specifically designed for Point of Sale (POS) fraud detection in real-time streaming environments.
-.sdsa
+.sdsa.
 ## Overview
 
 This system uses **Gaussian Anomaly Detection** (multivariate Gaussian distribution) to identify fraudulent transactions. It's optimized for the ESTEEC Olympics Hackathon challenge with the following features:
